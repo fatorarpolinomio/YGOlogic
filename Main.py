@@ -1,5 +1,6 @@
 from pickle import NONE
 import YGOlogic as ygo
+from network import Network
 
 def setup_game(net, is_host):
     """
