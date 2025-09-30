@@ -18,22 +18,19 @@ class Card():
         self.type = type;
         self.effect = effect;
 
-    # Getters e Setters básicos:
-
-    def getName(self):
-        return self.name;
-
-    def getATK(self):
-        return self.ATK;
-
-    def getDEF(self):
-        return self.DEF;
-
-    def getType(self):
-        return self.type;
-
-    def getEffect(self):
-        return self.effect;
+    def to_dict(self):
+        """converte o objeto Card para um dicionário para serialização em JSON"""
+        return {
+            "name": self.name,
+            "ATK": self.ATK,
+            "DEF": self.DEF,
+            "type": self.type.name, # .name para pegar o nome do Enum como texto
+            "effect": self.effect
+        }
+    
+    def __repr__(self):
+        """retorna uma representação em string do objeto"""
+        return f"Card({self.name}, ATK:{self.ATK}, DEF:{self.DEF})"
 
 class Player():
 
@@ -44,17 +41,6 @@ class Player():
         self.hand = [];
         self.deck = cards;
         self.graveyard = [];
-
-    # Getters e Setters básicos:
-
-    def getName(self):
-        return self.name;
-
-    def setLife(self, newLife):
-        self.life = newLife;
-
-    def getLife(self):
-        return self.life;
 
     # Embaralhar deck
     def shuffleDeck(self):
@@ -73,3 +59,16 @@ class Player():
     def initialHand(self):
         for i in range(5):
             self.drawCard();
+            
+    def create_standard_deck():
+    """cria e retorna uma lista de cartas padrão para um novo jogador"""
+    deck = [
+        Card("Mago Negro", 2500, 2100, CardType.MONSTER),
+        Card("Dragão Negro de Olhos Vermelhos", 2400, 2000, CardType.MONSTER),
+        Card("Dragão Branco de Olhos Azuis", 3000, 2500, CardType.MONSTER),
+        Card("Raigeki", None, None, CardType.MAGIC, "Destrói todos os monstros no campo do oponente."),
+        Card("Monster Reborn", None, None, CardType.MAGIC, "Ressuscita um monstro de qualquer cemitério.")
+       
+        # temos que decidir quais cartas por no deck inteiro e será o mesmo para ambos jogadores?
+    ]
+    return deck
