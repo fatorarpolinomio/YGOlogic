@@ -8,7 +8,7 @@ ouvinte_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 print("Socket 'ouvinte' criado.")
 
 # Define o endereço e a porta
-HOST = '127.0.0.1'  # Endereço IP para escutar
+HOST = socket.gethostbyname(socket.gethostname()); # Endereço IP para escutar
 PORTA = 65432      # Porta para escutar
 
 # vincula o socket ao endereço e porta
