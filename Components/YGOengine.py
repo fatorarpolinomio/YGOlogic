@@ -129,3 +129,63 @@ class YGOengine:
                     print("Saindo do jogo...")
                 else:
                     print("Ação inválida. Tente novamente.")
+
+# Resolve um ataque declarado, calcula os resultados e aplica ao estado do jogo.
+def resolveAttack(attackingPlayer, defendingPlayer, attackerMonster, targetMonster):
+
+    if not attackerMonster.canAttack:
+        print(f"LÓGICA DE SERVIDOR: Tentativa de ataque ilegal com {attackerMonster.name}.")
+        return # Ou envia uma mensagem de erro para o cliente
+
+    print(f"LÓGICA DE SERVIDOR: {attackerMonster.name} ataca {targetMonster.name}!")
+
+    # Futuramente: Aqui é o ponto para o oponente responder (enviar mensagem de 'ativar armadilha?')
+
+    results = damageCalc(attackerMonster, targetMonster)
+
+    # Aplica os danos
+    attackingPlayer.life -= results["playerDamage"]
+    defendingPlayer.life -= results["opponentDamage"]
+
+    # Atualiza status do monstro atacante
+    attackerMonster.canAttack = False
+
+    # Move monstros destruídos para o cemitério
+    if results["attackerDestroyed"]:
+        print(f"LÓGICA DE SERVIDOR: {attackerMonster.name} foi destruído.")
+        attackingPlayer.monsterIntoGraveyard(attackerMonster)
+
+    if results["targetDestroyed"]:
+        print(f"LÓGICA DE SERVIDOR: {targetMonster.name} foi destruído.")
+        defendingPlayer.monsterIntoGraveyard(targetMonster)
+
+    # Retorna o resultado para que o servidor possa enviá-lo a ambos os clientes
+    return results
+
+# Calcula o resultado de uma batalha sem alterar o estado do jogo.
+# Retorna um dicionário com os danos e quais monstros são destruídos.
+def damageCalc(atkMonter: cards.Monster, targetMonster: cards.Monster):
+
+    attackDifference = atkMonter.ATK - targetMonster.ATK;
+
+    playerDamage = 0;
+    opponentDamage = 0;
+    attackerDestroyed = False;
+    targetDestroyed = False;
+
+    if attackDifference > 0: # Atacante vence
+        opponentDamage = attackDifference;
+        targetDestroyed = True;
+    elif attackDifference < 0: # Alvo vence
+        playerDamage = abs(attackDifference);
+        attackerDestroyed = True;
+    else: # Bater cabeça
+        attackerDestroyed = True;
+        targetDestroyed = True;
+
+    return {
+        "playerDamage": playerDamage,
+        "opponentDamage": opponentDamage,
+        "attackerDestroyed": attackerDestroyed,
+        "targetDestroyed": targetDestroyed,
+    }

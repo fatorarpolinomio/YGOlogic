@@ -61,6 +61,16 @@ class Player:
     def intoGraveyard(self, Card):
         self.graveyard.append(Card)  # Coloca carta no topo do cemitério
 
+    def monsterIntoGraveyard(self, monster: card.Monster):
+        if monster in self.monstersInField:
+            self.monstersInField.remove(monster)
+            self.graveyard.append(monster)
+
+    def spellTrapIntoGraveyard(self, spellTrap):
+        if spellTrap in self.spellsAndTrapsInField:
+            self.spellsAndTrapsInField.remove(spellTrap)
+            self.graveyard.append(spellTrap)
+
     # Comprar cartas
     def drawCard(self):
         card = self.deck.pop()  # Retira carta do topo do deck

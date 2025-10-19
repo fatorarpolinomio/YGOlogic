@@ -22,6 +22,7 @@ class Card(ABC):
         self.ATK = ATK
         self.type = type
         self.effectDescription = effect
+        self.canAttack = False
 
     def to_dict(self):
         """converte o objeto Card para um dicionário para serialização em JSON"""
@@ -48,6 +49,7 @@ class Card(ABC):
 class Monster(Card):
     def __init__(self, name, ATK, type, effect):
         super().__init__(name, ATK, type, effect)
+        self.canAttack = True
 
     @override
     def effect(self, player: Player, opponent: Player):
