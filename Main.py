@@ -1,6 +1,7 @@
 from pickle import NONE
 import Components.YGOplayer as YGOplayer
 import Components.YGOactions as YGOactions
+import Components.YGOcards as YGOcards
 from network import Network
 
 
@@ -42,8 +43,8 @@ def setup_game(net, is_host):
         opponent_name = opponent_name_data["name"]
 
         # cria os objetos de jogador com mãos e decks vazios por enquanto
-        player = ygo.Player(player_name, 4000)
-        opponent = ygo.Player(opponent_name, 4000)
+        player = YGOplayer.Player(player_name, 4000)
+        opponent = YGOplayer.Player(opponent_name, 4000)
 
         print(f"Você ({player.name}) vs {opponent.name}")
 
@@ -58,12 +59,12 @@ def setup_game(net, is_host):
             player.hand = []
             for carta_dict in mao_recebida_em_dict:
                 # recria o objeto Card a partir do dicionário recebido via JSON
-                nova_carta = ygo.Card(
+                nova_carta = YGOcards.Card(
                     name=carta_dict["name"],
                     ATK=carta_dict["ATK"],
                     DEF=carta_dict["DEF"],
                     # converte a string de volta para o tipo Enum correto
-                    type=ygo.CardType[carta_dict["type"]],
+                    type=YGOcards.CardType[carta_dict["type"]],
                     effect=carta_dict["effect"],
                 )
                 player.hand.append(nova_carta)
