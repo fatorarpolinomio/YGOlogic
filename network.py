@@ -1,6 +1,6 @@
 import socket
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from Components.messages.YGOmessages import MessageType   
 
 class Network:
@@ -62,7 +62,7 @@ class Network:
             print(f"Erro de conexão ao enviar mensagem: {e}")
             return False 
 
-    def receive_message(self, timeout):
+    def receive_message(self, timeout: Optional[float] = None):
         "Recebe dados e retorna None se a conexão for perdida"
         
         try:
@@ -99,7 +99,17 @@ class Network:
         finally:
             if timeout is not None:
                 self.conn.settimeout(None)
-        
+
+    def _recv_exact(self, num_bytes: int):
+        "recebe exatamente num_bytes bytes ou None se desconectou"
+        data = b''
+        while len(data) < num_bytes:
+            chunk = self.conn.recv(num_bytes - len(data))
+            if not chunk:
+                return None
+            data += chunk
+        return data
+            
     def close(self):
         "fecha todas as conexões ativas de forma segura"
         print("Fechando conexões...")
