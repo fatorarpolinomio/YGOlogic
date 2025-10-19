@@ -70,14 +70,14 @@ class Network:
                 self.conn.settimeout(timeout)
 
             # recebe os bytes
-            length_bytes = self._recv_exact(4)
+            length_bytes = self.recv_exact(4)
 
             # verificação de desconexão
             if not length_bytes:
                 return None
             # recebendo a mensagem completa
             message_length = int.from_bytes(length_bytes, byteorder='big')
-            message_bytes = self._recv_exact(message_length)
+            message_bytes = self.recv_exact(message_length)
             if not message_bytes:
                 return None
             
@@ -100,7 +100,7 @@ class Network:
             if timeout is not None:
                 self.conn.settimeout(None)
 
-    def _recv_exact(self, num_bytes: int):
+    def recv_exact(self, num_bytes: int):
         "recebe exatamente num_bytes bytes ou None se desconectou"
         data = b''
         while len(data) < num_bytes:
