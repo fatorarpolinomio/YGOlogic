@@ -1,7 +1,8 @@
 from enum import Enum, auto
 from Components.YGOplayer import Player
 import Components.YGOactions as actions
-
+from Components.cards.Monsters import Monster
+from Components.cards.YGOcards import Card
 
 class GamePhase(Enum):
     DRAW = auto()
@@ -130,62 +131,109 @@ class YGOengine:
                 else:
                     print("Ação inválida. Tente novamente.")
 
-# Resolve um ataque declarado, calcula os resultados e aplica ao estado do jogo.
-def resolveAttack(attackingPlayer, defendingPlayer, attackerMonster, targetMonster):
+    # Métodos para MainPhase
 
-    if not attackerMonster.canAttack:
-        print(f"LÓGICA DE SERVIDOR: Tentativa de ataque ilegal com {attackerMonster.name}.")
-        return # Ou envia uma mensagem de erro para o cliente
+    # Função para invocar monstros
+    def summonMonster(self, player : Player, monster: Monster) -> dict:
+        if player.monstersCount >= 3:
+            print("Você atingiu o limite de monstros em campo (max: 3)") # Tirar
+            return {"success": False, "reason": "MONSTER_ZONE_FULL"}
 
-    print(f"LÓGICA DE SERVIDOR: {attackerMonster.name} ataca {targetMonster.name}!")
+        # A ação foi bem-sucedida. Altera o estado do jogo.
+        player.monstersInField.append(monster)
+        print(f"Você invocou {monster.name}!") # Tirar
+        player.monstersCount += 1
 
-    # Futuramente: Aqui é o ponto para o oponente responder (enviar mensagem de 'ativar armadilha?')
+        return {"success": True, "card_name": monster.name}
 
-    results = damageCalc(attackerMonster, targetMonster)
+    # Função para colocar carta virada para baixo
+    def setCard(self, player : Player, card: Card) -> dict:
+        if player.spellsAndTrapsCount >= 3:
+            print("Você atingiu o limite de magias e armadilhas em campo (max 3)") # Tirar
+            return {"success": False, "reason": "SPELL_TRAP_ZONE_FULL"}
 
-    # Aplica os danos
-    attackingPlayer.life -= results["playerDamage"]
-    defendingPlayer.life -= results["opponentDamage"]
+        player.spellsAndTrapsInField.append(card)
+        print(f"Você colocou a carta {card.name} virada para baixo") # Tirar
+        player.spellsAndTrapsCount += 1
+        return {"success": True, "card_name": card.name}
 
-    # Atualiza status do monstro atacante
-    attackerMonster.canAttack = False
+    # Função para ativar magia
+    def activateSpell(self, player : Player, opponent : Player, spell: Card):
+        if player.spellsAndTrapsCount >= 3:
+            print("Você atingiu o limite de magias e armadilhas em campo (max 3)") # Tirar
+            return {"success": False, "reason": "SPELL_TRAP_ZONE_FULL"}
 
-    # Move monstros destruídos para o cemitério
-    if results["attackerDestroyed"]:
-        print(f"LÓGICA DE SERVIDOR: {attackerMonster.name} foi destruído.")
-        attackingPlayer.monsterIntoGraveyard(attackerMonster)
+        print(f"Ativando a magia {spell.name}: ") # Tirar
+        spell.apply_effect(player, opponent)
+        return {"success": True, "card_name": spell.name}
 
-    if results["targetDestroyed"]:
-        print(f"LÓGICA DE SERVIDOR: {targetMonster.name} foi destruído.")
-        defendingPlayer.monsterIntoGraveyard(targetMonster)
+    # Métodos para fase de batalha:
 
-    # Retorna o resultado para que o servidor possa enviá-lo a ambos os clientes
-    return results
+    # Retorna uma lista de monstros que podem atacar
+    def getAttackableMonsters(self, player: Player) -> list[Monster]:
+        return [m for m in player.monstersInField if m.canAttack]
 
-# Calcula o resultado de uma batalha sem alterar o estado do jogo.
-# Retorna um dicionário com os danos e quais monstros são destruídos.
-def damageCalc(atkMonter: cards.Monster, targetMonster: cards.Monster):
+    # Retorna uma lista de monstros que podem ser alvos de um ataque
+    def getAttackTargets(self, opponent: Player) -> list[Monster]:
+        return opponent.monstersInField
 
-    attackDifference = atkMonter.ATK - targetMonster.ATK;
 
-    playerDamage = 0;
-    opponentDamage = 0;
-    attackerDestroyed = False;
-    targetDestroyed = False;
+    # Resolve um ataque declarado, calcula os resultados e aplica ao estado do jogo.
+    def resolveAttack(self, attackingPlayer : Player, defendingPlayer : Player, attackerMonster : Monster, targetMonster : Monster):
 
-    if attackDifference > 0: # Atacante vence
-        opponentDamage = attackDifference;
-        targetDestroyed = True;
-    elif attackDifference < 0: # Alvo vence
-        playerDamage = abs(attackDifference);
-        attackerDestroyed = True;
-    else: # Bater cabeça
-        attackerDestroyed = True;
-        targetDestroyed = True;
+        if not attackerMonster.canAttack:
+            print(f"LÓGICA DE SERVIDOR: Tentativa de ataque ilegal com {attackerMonster.name}.")
+            return # Ou envia uma mensagem de erro para o cliente
 
-    return {
-        "playerDamage": playerDamage,
-        "opponentDamage": opponentDamage,
-        "attackerDestroyed": attackerDestroyed,
-        "targetDestroyed": targetDestroyed,
-    }
+        print(f"LÓGICA DE SERVIDOR: {attackerMonster.name} ataca {targetMonster.name}!")
+
+        # Futuramente: Aqui é o ponto para o oponente responder (enviar mensagem de 'ativar armadilha?')
+
+        results = damageCalc(attackerMonster, targetMonster)
+
+        # Aplica os danos
+        attackingPlayer.life -= results["playerDamage"]
+        defendingPlayer.life -= results["opponentDamage"]
+
+        # Atualiza status do monstro atacante
+        attackerMonster.canAttack = False
+
+        # Move monstros destruídos para o cemitério
+        if results["attackerDestroyed"]:
+            print(f"LÓGICA DE SERVIDOR: {attackerMonster.name} foi destruído.")
+            attackingPlayer.monsterIntoGraveyard(attackerMonster)
+
+        if results["targetDestroyed"]:
+            print(f"LÓGICA DE SERVIDOR: {targetMonster.name} foi destruído.")
+            defendingPlayer.monsterIntoGraveyard(targetMonster)
+
+        # Retorna o resultado para que o servidor possa enviá-lo a ambos os clientes
+        return results
+
+    # Calcula o resultado de uma batalha sem alterar o estado do jogo.
+    # Retorna um dicionário com os danos e quais monstros são destruídos.
+    def damageCalc(self, atkMonter: Monster, targetMonster: Monster):
+
+        attackDifference = atkMonter.ATK - targetMonster.ATK;
+
+        playerDamage = 0;
+        opponentDamage = 0;
+        attackerDestroyed = False;
+        targetDestroyed = False;
+
+        if attackDifference > 0: # Atacante vence
+            opponentDamage = attackDifference;
+            targetDestroyed = True;
+        elif attackDifference < 0: # Alvo vence
+            playerDamage = abs(attackDifference);
+            attackerDestroyed = True;
+        else: # Bater cabeça
+            attackerDestroyed = True;
+            targetDestroyed = True;
+
+        return {
+            "playerDamage": playerDamage,
+            "opponentDamage": opponentDamage,
+            "attackerDestroyed": attackerDestroyed,
+            "targetDestroyed": targetDestroyed,
+        }

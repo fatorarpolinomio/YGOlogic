@@ -22,7 +22,7 @@ class Raigeki(Card):
     def effect(self, player: Player, opponent: Player):
         # Mandando todos para o cemitério
         for monster in opponent.monstersInField:
-            opponent.intoGraveyard(monster)
+            opponent.monsterIntoGraveyard(monster)
 
         # Limpando campo do oponente
         opponent.monstersInField.clear()
@@ -30,28 +30,18 @@ class Raigeki(Card):
         return
 
 
-class ReviverMonstro(Card):
+class DianKeto(Card):
     def __init__(self, name, ATK, type, effect):
         super().__init__(
-            "Reviver Monstro",
+            "Dian Keto, Mestre da Cura",
             None,
             CardType.MAGIC,
-            "Ressuscita um monstro do seu cemitério.",
+            "Ganhe 1000 pontos de vida.",
         )
 
     @override
     def effect(self, player: Player, opponent: Player):
-        count = 0
-        print("Seu cemitério:")
-        for monster in player.graveyard:
-            print(f"{count}) {monster}")
-            count += 1
-
-        escolhido = int(input("Terror do INSS! Escolha um monstro para ser revivido: "))
-        while escolhido < 0 or escolhido > count:
-            escolhido = int(input("ID da cova inválido, tente novamente: "))
-
-        player.summonMonster(player.graveyard[escolhido])
+        player.life += 1000
         return
 
 
@@ -82,11 +72,11 @@ class TempestadePesada(Card):
     def effect(self, player: Player, opponent: Player):
         # Limpando magias e armadilhas do controlador da carta
         for spellOrTrap in player.spellsAndTrapsInField:
-            player.intoGraveyard(spellOrTrap)
+            player.spellTrapIntoGraveyard(spellOrTrap)
         player.spellsAndTrapsInField.clear()
         # Limpando magias e armadilhas do oponente
         for spellOrTrap in opponent.spellsAndTrapsInField:
-            opponent.intoGraveyard(spellOrTrap)
+            opponent.spellTrapIntoGraveyard(spellOrTrap)
         opponent.spellsAndTrapsInField.clear()
         print("Alerta vermelho para tempestade forte (sem aula na each)")
         return

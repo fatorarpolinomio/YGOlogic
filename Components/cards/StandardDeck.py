@@ -18,7 +18,7 @@ standardDeck = [
     Monster("Caveira Invocada", 2500, CardType.MONSTER, ""),  # nível 6
     # Magic
     Spells.Raigeki,
-    Spells.ReviverMonstro,
+    Spells.DianKeto,
     Spells.PoteDaGanancia,
     Spells.TempestadePesada,
     # Traps
