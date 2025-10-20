@@ -53,32 +53,3 @@ class Player:
     def initialHand(self):
         for i in range(3):
             self.drawCard()
-
-    # Função para invocar monstros
-    def summonMonster(self, monster: card.Card):
-        if self.monstersCount == 3:
-            print("Você atingiu o limite de monstros em campo (max: 3)")
-            return
-        self.monstersInField.append(monster)
-        print(f"Você invocou {monster.name}!")
-        self.monstersCount += 1
-        return
-
-    # Função para colocar carta virada para baixo
-    def setCard(self, card: card.Card):
-        if self.spellsAndTrapsCount == 3:
-            print("Você atingiu o limite de magias e armadilhas em campo (max 3)")
-            return False
-
-        self.spellsAndTrapsInField.append(card)
-        print(f"Você colocou a carta {card.name} virada para baixo")
-        self.spellsAndTrapsCount += 1
-        return True
-
-    # Função para ativar magia
-    def activateSpell(self, spell: card.Card):
-        if self.spellsAndTrapsCount == 3:
-            print("Você atingiu o limite de magias e armadilhas em campo (max 3)")
-            return False
-
-        print(f"Ativando a magia {spell.name}: ")

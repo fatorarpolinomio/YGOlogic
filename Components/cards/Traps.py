@@ -1,5 +1,7 @@
 from __future__ import annotations
+from contextlib import AsyncExitStack
 from Components.cards.YGOcards import Card, CardType
+from Components.cards.Monsters import Monster
 import typing
 from typing import override
 from enum import Enum
@@ -21,7 +23,10 @@ class MirrorForce(Card):
 
     @override
     def effect(self, player: Player, opponent: Player):
-        return super().effect()
+        # Mandando todos para o cemitério
+        for monster in opponent.monstersInField:
+            opponent.monsterIntoGraveyard(monster)
+        return
 
 
 class Cilindro(Card):
@@ -32,6 +37,10 @@ class Cilindro(Card):
             CardType.TRAP,
             "Quando um monstro do oponente declarar um ataque: escolha o monstro atacante; negue o ataque e cause dano ao seu oponente igual ao ATK dele.",
         )
+        self.attackingMonster = ""
+
+    def setAttackingMonster(self, monster: Monster):
+        self.attackingMonster = monster
 
     @override
     def effect(self, player: Player, opponent: Player):
