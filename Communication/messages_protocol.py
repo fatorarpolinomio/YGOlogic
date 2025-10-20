@@ -37,7 +37,7 @@ class MessageConstructor:
     @staticmethod
     def setup_jogo(mao_inicial):
         """
-        Si "Sntaxe: {"tipo":SETUP_JOGO", "sua_mao": [lista_de_cartas]}
+        Sintaxe: {"tipo":SETUP_JOGO", "sua_mao": [lista_de_cartas]}
         Gramática: "tipo" = "SETUP_JOGO" | sua_mao é uma lista_de_cartas = [{name, ATK, type, effect}, ...]
         Semântica: Enviado pelo HOST para o GUEST no início do jogo
                    Contém as 3 cartas iniciais que o guest deve ter
