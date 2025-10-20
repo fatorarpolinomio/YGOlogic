@@ -15,10 +15,8 @@ class MessageType:
     INVOCAR_MONSTRO = "INVOCAR_MONSTRO"          # Apenas MAIN_1
     ATIVAR_MAGIA = "ATIVAR_MAGIA"               # MAIN_1
     COLOCAR_CARTA_BAIXO = "COLOCAR_CARTA_BAIXO"  # MAIN_1
-    
     DECLARAR_ATAQUE = "DECLARAR_ATAQUE"          # BATTLE
-    RESPOSTA_ATAQUE = "RESPOSTA_ATAQUE"          # MAIN_2 (oponente)
-    ATIVAR_ARMADILHA = "ATIVAR_ARMADILHA"         # MAIN_2 em resposta
+    ATIVAR_ARMADILHA = "ATIVAR_ARMADILHA"         # BATTLE em resposta
     
     # Notificações
     COMPROU_CARTA = "COMPROU_CARTA"
@@ -161,41 +159,22 @@ class MessageConstructor:
         }
     
     @staticmethod
-    def resposta_ataque(tem_armadilha, ativar_armadilha=False, trap_index=None):
+    def ativar_armadilha(tem_armadilha, ativar_armadilha=False, trap_index=None):
         """
-        Sintaxe: {"tipo": "RESPOSTA_ATAQUE", "fase": "MAIN_2",
+        Sintaxe: {"tipo": "ATIVAR_ARMADILHA", "fase": "BATTLE",
                   "tem_armadilha": bool, "ativar": bool, "trap_index": int|null}
-        Gramática: "tipo" = "RESPOSTA_ATAQUE" | "fase" + "MAIN_2" |tem_armadilha (bool) |
+        Gramática: "tipo" = "ATIVAR_ARMADILHA" | "fase" -> "BATTLE" |tem_armadilha (bool) |
                    ativar (bool) | trap_index (int) ou null
         Semântica: Oponente responde ao ataque declarado
                    Se ativar=True, especifica qual armadilha (trap_index)
                    Se ativar=False, ataque prossegue normalmente
         """
         return {
-            "tipo": MessageType.RESPOSTA_ATAQUE,
-            "fase": GamePhase.MAIN_2.name,
+            "tipo": MessageType.ATIVAR_ARMADILHA,
+            "fase": GamePhase.BATTLE.name,
             "tem_armadilha": tem_armadilha,
             "ativar": ativar_armadilha,
             "trap_index": trap_index
-        }
-    
-    @staticmethod
-    def ativar_armadilha(field_index, card_data, contexto):
-        """
-        Sintaxe: {"tipo": "ATIVAR_ARMADILHA", "fase": "MAIN_2",
-                  "field_index": int, "card": {...}, "contexto": {...}}
-        Gramática: // |card = {name: str, type: str, effect: str} | contexto "condições" = {trigger: str, attacker_index: int}
-        Semântica: Ativa e aplica efeito da armadilha em resposta ao ataque
-        """
-        return {
-            "tipo": MessageType.ATIVAR_ARMADILHA,
-            "fase": GamePhase.MAIN_2.name,
-            "field_index": field_index,
-            "card": {
-                "name": card_data["name"],
-                "effect": card_data.get("effect", "")
-            },
-            "contexto": contexto
         }
     
     @staticmethod
@@ -213,7 +192,7 @@ class MessageConstructor:
     def mudou_fase(nova_fase):
         """
         Sintaxe: {"tipo": "MUDOU_FASE", "fase": str}
-        Gramática: fase = "DRAW" | "MAIN_1" | "BATTLE" | "MAIN_2" | "END"
+        Gramática: fase = "DRAW" | "MAIN_1" | "BATTLE" | "END"
         Semântica: Notifica mudança de fase do turno
         """
         return {
@@ -257,8 +236,7 @@ class MessageConstructor:
         return {
             "tipo": MessageType.CONFIRMACAO,
             "action": action_type,
-            "success": success,
-            "message": message
+            "success": success
         }
     
     @staticmethod
