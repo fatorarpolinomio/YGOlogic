@@ -272,11 +272,4 @@ class MessageConstructor:
             "tipo": MessageType.ERRO,
             "message": mensagem_erro
         }
-
-
-# ***Processamento de mensagens***
-
-class MessageProcessor:
-    "Processa mensagens recebidas e executa as ações correspondentes"
-    
-        
+ 
