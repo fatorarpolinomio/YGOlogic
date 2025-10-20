@@ -2,37 +2,14 @@ from __future__ import annotations
 import typing
 from enum import Enum
 import random
-import Components.YGOcards as card
+
+import Components.cards.StandardDeck as deck
+import Components.cards.Monsters as monsters
+import Components.cards.Spells as spells
+import Components.cards.Traps as traps
 
 if typing.TYPE_CHECKING:
-    import Components.YGOcards as card
-
-# Criando deck padrão para cada jogador (sim, ambos terão o mesmo deck, isso aqui é um ep de redes meu deus)
-standardDeck = [
-    # Monsters ---> Percebi que precisamos colocar o nível das cartas de monstros
-    card.Monster("Mago Negro", 2500, card.CardType.MONSTER, ""),
-    card.Monster("Dragão Negro de Olhos Vermelhos", 2400, card.CardType.MONSTER, ""),
-    card.Monster("Dragão Branco de Olhos Azuis", 3000, card.CardType.MONSTER, ""),
-    card.Monster(
-        "Dragão Filhote", 1200, card.CardType.MONSTER, ""
-    ),  # nível 3 (arrumar dps)
-    card.Monster("Guardião Celta", 1400, card.CardType.MONSTER, ""),  # nível 4
-    card.Monster("Dragão do Brilho", 1900, card.CardType.MONSTER, ""),  # nível 4
-    card.Monster("Elfa Mística", 800, card.CardType.MONSTER, ""),  # nível 4
-    card.Monster("Kaiser Violento", 1800, card.CardType.MONSTER, ""),  # nível 5
-    card.Monster("Caveira Invocada", 2500, card.CardType.MONSTER, ""),  # nível 6
-    # Magic
-    card.Raigeki,
-    card.ReviverMonstro,
-    card.PoteDaGanancia,
-    card.TempestadePesada,
-    # Traps
-    card.MirrorForce,
-    card.Cilindro,
-    card.BuracoArmadilha,
-    card.Aparelho,
-    card.NegateAttack,
-]
+    import Components.cards.YGOcards as card
 
 
 class Player:
@@ -42,7 +19,7 @@ class Player:
         self.name = name
         self.life = life
         self.hand = []
-        self.deck = standardDeck
+        self.deck = deck.standardDeck
         self.graveyard = []
         self.monstersInField = []
         self.monstersCount = (
@@ -57,11 +34,7 @@ class Player:
     def shuffleDeck(self):
         random.shuffle(self.deck)
 
-    # Adicionar cartas ao cemitério do jogador
-    def intoGraveyard(self, Card):
-        self.graveyard.append(Card)  # Coloca carta no topo do cemitério
-
-    def monsterIntoGraveyard(self, monster: card.Monster):
+    def monsterIntoGraveyard(self, monster: monsters.Monster):
         if monster in self.monstersInField:
             self.monstersInField.remove(monster)
             self.graveyard.append(monster)
