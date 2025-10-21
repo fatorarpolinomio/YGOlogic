@@ -270,6 +270,7 @@ class YGOengine:
 
         # Remove da mão (se ainda estiver lá)
         if spell in player.hand:
+            card_index = player.hand.index(spell)
             player.hand.remove(spell)
 
         spell.apply_effect(player, opponent) # aplica o efeito
@@ -277,7 +278,7 @@ class YGOengine:
 
         # Envia mensagem
         message = MessageConstructor.ativar_magia(
-            card_index=-1,  # não importa o índice, carta já foi ativada
+            card_index=card_index,  
             card_data={
                 "name": spell.name,
                 "type": spell.type.name,
@@ -292,6 +293,12 @@ class YGOengine:
     
     def activateTrap(self, player : Player, opponent : Player, trap: Card):
         print(f"Ativando a armadilha: {trap.name}")
+        # pegando index para mensagem
+        if trap in player.spellsAndTrapsInField:
+            trap_index = player.spellsAndTrapsInField.index(trap)
+        else:
+            trap_index = -1
+
         trap.apply_effect(player, opponent)
 
         # movendo para cemitério
@@ -301,7 +308,6 @@ class YGOengine:
         player.graveyard.append(trap)
         
         # enviando mensagem
-        trap_index = -1  # Carta já foi ativada
         message = MessageConstructor.ativar_armadilha(
             tem_armadilha=True,
             ativar_armadilha=True,
