@@ -30,60 +30,63 @@ class MirrorForce(Card):
 
 
 class Cilindro(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self, name, ATK, type, effect, attackingMonster: Monster):
         super().__init__(
             "Cilindro Mágico",
             None,
             CardType.TRAP,
             "Quando um monstro do oponente declarar um ataque: escolha o monstro atacante; negue o ataque e cause dano ao seu oponente igual ao ATK dele.",
         )
-        self.attackingMonster = ""
-
-    def setAttackingMonster(self, monster: Monster):
-        self.attackingMonster = monster
+        self.attackingMonster = attackingMonster
 
     @override
     def effect(self, player: Player, opponent: Player):
-        return super().effect()
+        opponent.life = opponent.life - self.attackingMonster.ATK
+        return
 
 
 class BuracoArmadilha(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self, name, ATK, type, effect, attackingMonster: Monster):
         super().__init__(
             "Buraco Armadilha",
             None,
             CardType.TRAP,
-            "Quando seu oponente Invocar por Invocação-Normal ou Virar um monstro com 1000 ou mais de ATK: escolha o monstro; destrua o alvo.",
+            "Quando seu oponente atacar com um monstro: escolha o monstro; destrua o alvo.",
         )
+        self.attackingMonster = attackingMonster
 
     @override
     def effect(self, player: Player, opponent: Player):
-        return super().effect()
+        opponent.monsterIntoGraveyard(self.attackingMonster)
+        return
 
 
 class Aparelho(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self, name, ATK, type, effect, attackingMonster: Monster):
         super().__init__(
             "Aparelho de Evacuação Obrigatória",
             None,
             CardType.TRAP,
-            "Escolha 1 monstro no campo; devolva o alvo para a mão.",
+            "Quando seu oponente atacar com um monstro: escolha o monstro; devolva o alvo para a mão.",
         )
+        self.attackingMonster = attackingMonster
 
     @override
     def effect(self, player: Player, opponent: Player):
-        return super().effect()
+        opponent.hand.append(self.attackingMonster)
+        return
 
 
 class NegateAttack(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self, name, ATK, type, effect, attackingMonster: Monster):
         super().__init__(
             "Negativação de Ataque",
             None,
             CardType.TRAP,
             "Quando um monstro do oponente declarar um ataque: escolha o monstro atacante; negue o ataque.",
         )
+        self.attackingMonster = attackingMonster
 
     @override
     def effect(self, player: Player, opponent: Player):
-        return super().effect()
+        return
