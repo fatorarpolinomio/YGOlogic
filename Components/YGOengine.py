@@ -3,6 +3,8 @@ from Components.YGOplayer import Player
 import Components.YGOactions as actions
 from Components.cards.Monsters import Monster
 from Components.cards.YGOcards import Card
+from Communication.network import Network
+from Communication.messages_protocol import MessageConstructor, MessageType
 
 class GamePhase(Enum):
     DRAW = auto()
@@ -127,7 +129,7 @@ class YGOengine:
                 # 4. Damage Step: Calcular dano, destruir monstros, etc.
             elif action == "2":
                 # Fim da battle
-                break;
+                break
             else:
                 print("Ação inválida.")
 
@@ -197,11 +199,11 @@ class YGOengine:
         return {"success": True, "card_name": spell.name}
 
     # Métodos para fase de batalha:
-
+    
     def activateTrap(self, player : Player, opponent : Player, trap: Card):
         trap.apply_effect(player, opponent)
         return {"success": True, "card_name": trap.name}
-
+    
     # Retorna uma lista de monstros que podem atacar
     def getAttackableMonsters(self, player: Player) -> list[Monster]:
         return [m for m in player.monstersInField if m.canAttack]
@@ -214,22 +216,22 @@ class YGOengine:
     # Retorna um dicionário com os danos e quais monstros são destruídos.
     def damageCalc(self, atkMonter: Monster, targetMonster: Monster):
 
-        attackDifference = atkMonter.ATK - targetMonster.ATK;
+        attackDifference = atkMonter.ATK - targetMonster.ATK
 
-        playerDamage = 0;
-        opponentDamage = 0;
-        attackerDestroyed = False;
-        targetDestroyed = False;
+        playerDamage = 0
+        opponentDamage = 0
+        attackerDestroyed = False
+        targetDestroyed = False
 
         if attackDifference > 0: # Atacante vence
-            opponentDamage = attackDifference;
-            targetDestroyed = True;
+            opponentDamage = attackDifference
+            targetDestroyed = True
         elif attackDifference < 0: # Alvo vence
-            playerDamage = abs(attackDifference);
-            attackerDestroyed = True;
+            playerDamage = abs(attackDifference)
+            attackerDestroyed = True
         else: # Bater cabeça
-            attackerDestroyed = True;
-            targetDestroyed = True;
+            attackerDestroyed = True
+            targetDestroyed = True
 
         return {
             "playerDamage": playerDamage,
@@ -237,7 +239,7 @@ class YGOengine:
             "attackerDestroyed": attackerDestroyed,
             "targetDestroyed": targetDestroyed,
         }
-
+    
     # Resolve um ataque declarado, calcula os resultados e aplica ao estado do jogo.
     def resolveAttack(self, attackingPlayer : Player, defendingPlayer : Player, attackerMonster : Monster, targetMonster : Monster):
 
@@ -269,3 +271,31 @@ class YGOengine:
 
         # Retorna o resultado para que o servidor possa enviá-lo a ambos os clientes
         return results
+
+    # Calcula o resultado de uma batalha sem alterar o estado do jogo.
+    # Retorna um dicionário com os danos e quais monstros são destruídos.
+    def damageCalc(self, atkMonter: Monster, targetMonster: Monster):
+
+        attackDifference = atkMonter.ATK - targetMonster.ATK;
+
+        playerDamage = 0;
+        opponentDamage = 0;
+        attackerDestroyed = False;
+        targetDestroyed = False;
+
+        if attackDifference > 0: # Atacante vence
+            opponentDamage = attackDifference;
+            targetDestroyed = True;
+        elif attackDifference < 0: # Alvo vence
+            playerDamage = abs(attackDifference);
+            attackerDestroyed = True;
+        else: # Bater cabeça
+            attackerDestroyed = True;
+            targetDestroyed = True;
+
+        return {
+            "playerDamage": playerDamage,
+            "opponentDamage": opponentDamage,
+            "attackerDestroyed": attackerDestroyed,
+            "targetDestroyed": targetDestroyed,
+        }
