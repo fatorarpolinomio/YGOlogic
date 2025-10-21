@@ -8,7 +8,6 @@ class GamePhase(Enum):
     DRAW = auto()
     MAIN_1 = auto()
     BATTLE = auto()
-    MAIN_2 = auto()
     END = auto()
 
 
@@ -23,6 +22,36 @@ class YGOengine:
 
         # Flags de controle por turno
         self.summonThisTurn = False
+
+    def advanceToNextPhase(self):
+        """Avança o jogo para a próxima fase lógica."""
+        if self.currentPhase == GamePhase.DRAW:
+            self.currentPhase = GamePhase.MAIN_1
+        elif self.currentPhase == GamePhase.MAIN_1:
+            self.currentPhase = GamePhase.BATTLE
+        elif self.currentPhase == GamePhase.BATTLE:
+            self.currentPhase = GamePhase.END
+        # Retorna a nova fase para o orquestrador saber o que aconteceu.
+        return self.currentPhase
+
+    def endTurn(self):
+        """Executa a lógica de fim de turno."""
+        self.turnPlayer, self.nonTurnPlayer = self.nonTurnPlayer, self.turnPlayer
+        self.turnCount += 1
+        self.summonThisTurn = False
+        self.currentPhase = GamePhase.DRAW
+
+    def getLegalActions(self) -> list[str]:
+        """Pergunta ao Engine: 'O que o jogador pode fazer agora?'"""
+        actions = ["VIEW_HAND", "VIEW_FIELD", "VIEW_GRAVEYARD"]
+        if self.currentPhase == GamePhase.MAIN_1:
+            actions.append("GO_TO_BATTLE_PHASE")
+            actions.append("END_TURN")
+        elif self.currentPhase == GamePhase.BATTLE:
+            actions.append("DECLARE_ATTACK")
+            actions.append("END_TURN")
+
+        return actions
 
     def runTurn(self):
         print(f"\n--- Turno {self.turnCount} para {self.turnPlayer.name} ---")
@@ -169,6 +198,10 @@ class YGOengine:
 
     # Métodos para fase de batalha:
 
+    def activateTrap(self, player : Player, opponent : Player, trap: Card):
+        trap.apply_effect(player, opponent)
+        return {"success": True, "card_name": trap.name}
+
     # Retorna uma lista de monstros que podem atacar
     def getAttackableMonsters(self, player: Player) -> list[Monster]:
         return [m for m in player.monstersInField if m.canAttack]
@@ -177,6 +210,33 @@ class YGOengine:
     def getAttackTargets(self, opponent: Player) -> list[Monster]:
         return opponent.monstersInField
 
+    # Calcula o resultado de uma batalha sem alterar o estado do jogo.
+    # Retorna um dicionário com os danos e quais monstros são destruídos.
+    def damageCalc(self, atkMonter: Monster, targetMonster: Monster):
+
+        attackDifference = atkMonter.ATK - targetMonster.ATK;
+
+        playerDamage = 0;
+        opponentDamage = 0;
+        attackerDestroyed = False;
+        targetDestroyed = False;
+
+        if attackDifference > 0: # Atacante vence
+            opponentDamage = attackDifference;
+            targetDestroyed = True;
+        elif attackDifference < 0: # Alvo vence
+            playerDamage = abs(attackDifference);
+            attackerDestroyed = True;
+        else: # Bater cabeça
+            attackerDestroyed = True;
+            targetDestroyed = True;
+
+        return {
+            "playerDamage": playerDamage,
+            "opponentDamage": opponentDamage,
+            "attackerDestroyed": attackerDestroyed,
+            "targetDestroyed": targetDestroyed,
+        }
 
     # Resolve um ataque declarado, calcula os resultados e aplica ao estado do jogo.
     def resolveAttack(self, attackingPlayer : Player, defendingPlayer : Player, attackerMonster : Monster, targetMonster : Monster):
@@ -209,31 +269,3 @@ class YGOengine:
 
         # Retorna o resultado para que o servidor possa enviá-lo a ambos os clientes
         return results
-
-    # Calcula o resultado de uma batalha sem alterar o estado do jogo.
-    # Retorna um dicionário com os danos e quais monstros são destruídos.
-    def damageCalc(self, atkMonter: Monster, targetMonster: Monster):
-
-        attackDifference = atkMonter.ATK - targetMonster.ATK;
-
-        playerDamage = 0;
-        opponentDamage = 0;
-        attackerDestroyed = False;
-        targetDestroyed = False;
-
-        if attackDifference > 0: # Atacante vence
-            opponentDamage = attackDifference;
-            targetDestroyed = True;
-        elif attackDifference < 0: # Alvo vence
-            playerDamage = abs(attackDifference);
-            attackerDestroyed = True;
-        else: # Bater cabeça
-            attackerDestroyed = True;
-            targetDestroyed = True;
-
-        return {
-            "playerDamage": playerDamage,
-            "opponentDamage": opponentDamage,
-            "attackerDestroyed": attackerDestroyed,
-            "targetDestroyed": targetDestroyed,
-        }
