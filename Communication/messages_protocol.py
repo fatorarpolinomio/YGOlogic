@@ -1,6 +1,7 @@
 # Aqruivo para definição do protocolo de comunicação para cada mensagem
 
 from Components.YGOengine import GamePhase
+from typing import Dict, Any, List, Optional
 
 class MessageType:
     "Classe para definir os tipos de mensagens possíveis"
@@ -185,7 +186,7 @@ class MessageConstructor:
         Semântica: Notifica que jogador comprou carta, não revela qual carta
         """
         return {
-            "tipo": MessageType.COMPROU_CARTA,
+            "tipo": MessageType.COMPROU_CARTA
         }
     
     @staticmethod
@@ -227,7 +228,7 @@ class MessageConstructor:
         }
 
     @staticmethod
-    def confirmacao(action_type, success=True, message=""):
+    def confirmacao(action_type, success):
         """
         Sintaxe: {"tipo": "CONFIRMACAO", "action": str, "success": bool, "message": str}
         Gramática: // | action = ação confirmada (str) | success (bool) | message (str)

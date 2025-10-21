@@ -9,6 +9,8 @@ class Network:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # variável que guardará a conexão específica com o outro jogador
         self.conn = None
+        # flag para rastrear estado da conexão
+        self.is_connected = False
 
     def host_game(self, host, port):
         "Configura o jogador como anfitrião (servidor) e espera por uma conexão"
@@ -20,6 +22,7 @@ class Network:
             print("Esperando por um oponente...")
             # ´pausa o programa e espera uma conexão. Retorna um novo socket (conn) para a comunicação
             self.conn, addr = self.socket.accept()
+            self.is_connected = True 
             print(f"Oponente {addr} se conectou.")
             return True # true se a conexão foi bem sucedida
         except socket.error as e:
@@ -33,21 +36,27 @@ class Network:
             self.socket.connect((host, port))
             # Para o cliente, o socket principal é o mesmo da comunicação.
             self.conn = self.socket
+            self.is_connected = True
             print("Conectado ao anfitrião!")
             return True 
         except socket.error as e:
             print(f"Erro ao conectar: {e}")
             return False 
 
-    def send_message(self, message_type: MessageType, data: Dict[str, Any] = None):
+    def send_message(self, message: Dict[str, Any]):
         "Envia uma mensagem estruturada pela rede e retorna False se a conexão falhar"
-        if data is None:
-            data = {}
-            
-        message = {
-            "tipo": message_type.value,
-            **data
-        }
+        # Verificação de estado
+        if not self.is_connected or self.conn is None:
+            print("Erro: Não há conexão ativa")
+            return False
+        
+        # validação básica
+        if not isinstance(message, dict):
+            print("Erro: Mensagem deve ser um dicionário")
+            return False
+        
+        if "tipo" not in message:
+            print("Aviso: Mensagem sem campo 'tipo'")
         try:
             # Converte o dicionário Python para uma string no formato JSON
             # Codifica a string JSON para o formato de bytes (utf-8) )que é o que a rede transporta)
@@ -61,9 +70,16 @@ class Network:
         except(socket.error, BrokenPipeError) as e:
             print(f"Erro de conexão ao enviar mensagem: {e}")
             return False 
+        except (TypeError, ValueError) as e:
+            print(f"❌ Erro ao serializar mensagem: {e}")
+            return False
 
     def receive_message(self, timeout: Optional[float] = None):
         "Recebe dados e retorna None se a conexão for perdida"
+        # mesmo de send -> verificação de estado
+        if not self.is_connected or self.conn is None:
+            print("Erro: Não há conexão ativa")
+            return None
         
         try:
             if timeout is not None:
@@ -77,6 +93,11 @@ class Network:
                 return None
             # recebendo a mensagem completa
             message_length = int.from_bytes(length_bytes, byteorder='big')
+            # verificação de tamanho inválido
+            if message_length <= 0:
+                print(f"Tamanho de mensagem inválido: {message_length}")
+                return None
+            # recebendo a msg completa
             message_bytes = self.recv_exact(message_length)
             if not message_bytes:
                 return None
@@ -96,6 +117,9 @@ class Network:
         except json.JSONDecodeError:
             print("Erro ao decodificar a mensagem JSON. Pode ter sido corrompida ou incompleta.")
             return None
+        except UnicodeDecodeError as e:
+            print(f"Erro de codificação UTF-8: {e}")
+            return None
         finally:
             if timeout is not None:
                 self.conn.settimeout(None)
@@ -104,25 +128,33 @@ class Network:
         "recebe exatamente num_bytes bytes ou None se desconectou"
         data = b''
         while len(data) < num_bytes:
-            chunk = self.conn.recv(num_bytes - len(data))
-            if not chunk:
+            try:
+                chunk = self.conn.recv(num_bytes - len(data))
+                if not chunk:
+                    return None
+                data += chunk
+            except socket.error as e:
                 return None
-            data += chunk
         return data
             
     def close(self):
         "fecha todas as conexões ativas de forma segura"
         print("Fechando conexões...")
+        self.is_connected = False
         # O anfitrião tem um 'conn' separado do 'socket' principal
         # convidado usa o 'socket' principal como 'conn', então a verificação é importante
         if self.conn and self.conn is not self.socket:
             try:
+                # shutdown para n permitir mais send/receive
+                self.conn.shutdown(socket.SHUT_RDWR)
                 self.conn.close()
+                print("Conexão fechada")
             except socket.error as e:
                 print(f"Erro ao fechar a conexão: {e}")
         
         # fecha o socket principal
         try:
+            self.socket.shutdown(socket.SHUT_RDWR)
             self.socket.close()
         except socket.error as e:
             print(f"Erro ao fechar o socket principal: {e}")
