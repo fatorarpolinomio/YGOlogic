@@ -1,10 +1,57 @@
 import Components.YGOplayer as player
 import Components.cards.YGOcards as cards
 from Components.cards.YGOcards import CardType
+from Components.YGOengine import YGOengine
+from Components.YGOengine import GamePhase
+
 
 class YGOinterface:
+    def promptMainPhaseActions(self, playerName: str) -> str:
+        print("\nAções possíveis da Main Phase:")
+        print("[1] Ver Mão")
+        print("[2] Olhar Campo")
+        print("[3] Olhar Cemitério")
+        print("[4] Ir para Battle Phase")
+        print("[5] Encerrar Turno")
 
-    def cardAction(self, card : cards.Card, playerCanSummon: bool) -> dict | None:
+        while True:
+            choice = input(f"{playerName}, escolha sua ação: ")
+            if choice == "1":
+                return "VIEW_HAND"
+            if choice == "2":
+                return "VIEW_FIELD"
+            if choice == "3":
+                return "VIEW_GRAVEYARD"
+            if choice == "4":
+                return "GO_TO_BATTLE_PHASE"
+            if choice == "5":
+                return "END_TURN"
+            print("Opção inválida.")
+
+    def promptBattlePhaseActions(self, playerName: str) -> str:
+        print("\nAções possíveis da Main Phase:")
+        print("[1] Olhar Campo")
+        print("[2] Olhar Cemitério")
+        print("[3] Atacar")
+        print("[4] Encerrar Turno")
+
+        while True:
+            choice = input(f"{playerName}, escolha sua ação: ")
+            if choice == "1":
+                return "VIEW_FIELD"
+            if choice == "2":
+                return "VIEW_GRAVEYARD"
+            if choice == "3":
+                return "DECLARE_ATTACK"
+            if choice == "4":
+                return "END_TURN"
+            print("Opção inválida.")
+
+    def displayPhase(self, phaseName: str, playerName: str, turnCount: int):
+        print(f"\n--- Turno {turnCunt} para {playerName} ---")
+        print(f"Fase: {phaseName}")
+
+    def cardAction(self, card: cards.Card, playerCanSummon: bool) -> dict | None:
         """
         Mostra as ações para uma carta e retorna um "comando" representando a escolha do jogador.
         NÃO executa a ação, apenas pergunta.
@@ -27,6 +74,11 @@ class YGOinterface:
             options[option_index] = {"action": "SET_CARD", "card": card}
             option_index += 1
 
+        elif card.type == CardType.TRAP:
+            print(f"{option_index}) Baixar Carta")
+            options[option_index] = {"action": "SET_CARD", "card": card}
+            option_index += 1
+
         print("0) Voltar")
 
         while True:
@@ -41,7 +93,6 @@ class YGOinterface:
             except ValueError:
                 print("Por favor, digite um número válido.")
 
-
     # Função para olhar o próprio campo ou o do oponente
     def viewField(self, player: player.Player, opponent: player.Player):
         visualiza = int(
@@ -54,7 +105,9 @@ class YGOinterface:
                 print(f"{count}) {monster.name} - ATK {monster.ATK}")
                 count += 1
             count = 0
-            print("Você tem as seguintes magias/armadilhas viradas para baixo em campo: ")
+            print(
+                "Você tem as seguintes magias/armadilhas viradas para baixo em campo: "
+            )
             for spellTrap in player.spellsAndTrapsInField:
                 print(f"{count}) {spellTrap.name}")
                 count += 1
@@ -66,7 +119,7 @@ class YGOinterface:
                 print(f"{count}) {monster.name} - ATK {monster.ATK}")
                 count += 1
         else:
-            print("Opção inválida!"))
+            print("Opção inválida!")
 
     # Função para olhar o próprio cemitério
     def viewGraveyard(self, player: player.Player):
@@ -75,7 +128,6 @@ class YGOinterface:
         for card in player.graveyard:
             print(f"{count}) {card.name}")
             count += 1
-
 
     # Função para olhar a própria mão
     def viewHand(self, player: player.Player, playerCanSummon: bool):
@@ -95,4 +147,4 @@ class YGOinterface:
         if next == 0:
             return
         else:
-            selectCard(player, player.hand[next], playerCanSummon)
+            self.cardAction(player.hand[next], playerCanSummon)

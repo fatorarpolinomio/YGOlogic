@@ -1,8 +1,9 @@
-from pickle import NONE
-import Components.YGOplayer as YGOplayer
-import Components.YGOactions as YGOactions
-import Components.YGOcards as YGOcards
-from network import Network
+from Components.YGOengine import YGOengine, GamePhase
+from Components.YGOinterface import YGOinterface
+from Components.YGOplayer import Player
+from Components.cards.YGOcards import Card
+from Components.cards.YGOcards import CardType
+from Communication.network import Network
 
 
 def setup_game(net, is_host):
@@ -13,7 +14,7 @@ def setup_game(net, is_host):
     if is_host:
         player_name = input("Digite seu nome: ")
 
-        player = YGOplayer.Player(player_name, 4000)
+        player = Player(player_name, 4000)
         player.shuffleDeck()
         player.initialHand()
 
@@ -22,7 +23,7 @@ def setup_game(net, is_host):
         opponent_name = opponent_name_data["name"]
         net.send_message({"name": player.name})
 
-        opponent = YGOplayer.Player(opponent_name, 4000)
+        opponent = Player(opponent_name, 4000)
         opponent.shuffleDeck()
         opponent.initialHand()
 
@@ -43,8 +44,8 @@ def setup_game(net, is_host):
         opponent_name = opponent_name_data["name"]
 
         # cria os objetos de jogador com mãos e decks vazios por enquanto
-        player = YGOplayer.Player(player_name, 4000)
-        opponent = YGOplayer.Player(opponent_name, 4000)
+        player = Player(player_name, 4000)
+        opponent = Player(opponent_name, 4000)
 
         print(f"Você ({player.name}) vs {opponent.name}")
 
@@ -59,12 +60,12 @@ def setup_game(net, is_host):
             player.hand = []
             for carta_dict in mao_recebida_em_dict:
                 # recria o objeto Card a partir do dicionário recebido via JSON
-                nova_carta = YGOcards.Card(
+                nova_carta = Card(
                     name=carta_dict["name"],
                     ATK=carta_dict["ATK"],
                     DEF=carta_dict["DEF"],
                     # converte a string de volta para o tipo Enum correto
-                    type=YGOcards.CardType[carta_dict["type"]],
+                    type=CardType[carta_dict["type"]],
                     effect=carta_dict["effect"],
                 )
                 player.hand.append(nova_carta)
@@ -95,11 +96,11 @@ def run_game_loop(net, is_host, player, opponent):
                 )
 
                 if action == "1":
-                    YGOactions.viewHand(player)
+                    YGOinterface.viewHand(player)
                 elif action == "2":
-                    YGOactions.viewField(player, opponent)
+                    YGOinterface.viewField(player, opponent)
                 elif action == "3":
-                    YGOactions.viewGraveyard(player)
+                    YGOinterface.viewGraveyard(player)
                 elif action == "4":
                     print("Você passou o turno.")
                     # Envia a mensagem e verifica se o envio foi bem-sucedido
