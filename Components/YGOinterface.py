@@ -1,4 +1,5 @@
 import Components.YGOplayer as player
+from Components.cards.Monsters import Monster
 import Components.cards.YGOcards as cards
 from Components.cards.YGOcards import CardType
 from Components.YGOengine import YGOengine
@@ -29,7 +30,7 @@ class YGOinterface:
             print("Opção inválida.")
 
     def promptBattlePhaseActions(self, playerName: str) -> str:
-        print("\nAções possíveis da Main Phase:")
+        print("\nAções possíveis da Batalha:")
         print("[1] Olhar Campo")
         print("[2] Olhar Cemitério")
         print("[3] Atacar")
@@ -48,7 +49,7 @@ class YGOinterface:
             print("Opção inválida.")
 
     def displayPhase(self, phaseName: str, playerName: str, turnCount: int):
-        print(f"\n--- Turno {turnCunt} para {playerName} ---")
+        print(f"\n--- Turno {turnCount} para {playerName} ---")
         print(f"Fase: {phaseName}")
 
     def cardAction(self, card: cards.Card, playerCanSummon: bool) -> dict | None:
@@ -148,3 +149,43 @@ class YGOinterface:
             return
         else:
             self.cardAction(player.hand[next], playerCanSummon)
+
+    def selectAttacker(self, attackers: list[Monster]) -> Monster:
+        count = 0
+        print("Você tem os seguintes monstros em campo: ")
+        for monster in attackers:
+            print(f"{count}) {monster.name} - ATK {monster.ATK}")
+            count += 1
+
+        target = int(
+            input(
+                "Digite o índice do monstro alvo para selecioná-lo ou 0 para cancelar o ataque: "
+            )
+        )
+        while target < 0 or target > len(attackers):
+            target = int(input("Opção inválida! Tente novamente: "))
+
+        if target == 0:
+            return None
+        else:
+            return attackers[target]
+
+    def targetMonsterForAttack(self, targets: list[Monster]) -> Monster:
+        count = 0
+        print("Você tem os seguintes monstros em campo: ")
+        for monster in targets:
+            print(f"{count}) {monster.name} - ATK {monster.ATK}")
+            count += 1
+
+        target = int(
+            input(
+                "Digite o índice do monstro alvo para selecioná-lo ou 0 para cancelar o ataque: "
+            )
+        )
+        while target < 0 or target > len(targets):
+            target = int(input("Opção inválida! Tente novamente: "))
+
+        if target == 0:
+            return None
+        else:
+            return targets[target]

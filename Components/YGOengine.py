@@ -4,6 +4,7 @@ from Components.cards.Monsters import Monster
 from Components.cards.YGOcards import Card
 from Communication.network import Network
 from Communication.messages_protocol import MessageConstructor, MessageType
+from Components.YGOinterface import YGOinterface
 
 
 # Enum para definir os estados do jogo
@@ -101,7 +102,6 @@ class YGOengine:
             return {"message": "Ver campo."}
 
         elif actionCommand == "VIEW_GRAVEYARD":
-            self.turnPlayer.viewGraveyard()
             return {"message": "Ver cemitério."}
 
         elif actionCommand == "SUMMON_MONSTER":

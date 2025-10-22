@@ -83,8 +83,72 @@ def run_game_loop(net, is_host, player, opponent):
     my_turn = is_host
     game_over = False
 
+    # Inicializando as duas classes principais:
+    engine = YGOengine(player, opponent, net, is_host)
+    interface = YGOinterface()
+
     # loop continua enquanto o jogo não acabar
     while not game_over:
+
+        currentPlayer = engine.turnPlayer
+        currentPhase = engine.currentPhase
+
+        interface.displayPhase(currentPhase.name, currentPlayer.name, engine.turnCount)
+
+        if currentPhase == GamePhase.DRAW:
+            # print da fase de compra na interface
+            # drawCard na engine
+            engine.advanceToNextPhase()
+            continue
+
+        actionString = None;
+        if currentPhase == GamePhase.MAIN_1:
+            actionString = interface.promptMainPhaseActions(currentPlayer.name)
+        elif currentPhase == GamePhase.BATTLE:
+            actionString = interface.promptBattlePhaseActions(currentPlayer.name)
+        elif currentPhase == GamePhase.END
+            engine.endTurn()
+            continue
+
+        if actionString in ["GO_TO_BATTLE_FASE","END_TURN"]:
+            result = engine.processPlayerAction(actionString)
+        elif actionString == "VIEW_FIELD":
+            interface.viewField(engine.turnPlayer, engine.nonTurnPlayer)
+        elif actionString == "VIEW_GRAVEYARD":
+            interface.viewGraveyard(engine.turnPlayer)
+        elif actionString == "VIEW_HAND":
+            commandDict = interface.viewHand(engine.turnPlayer)
+            if command_dict:
+                # O usuário selecionou uma carta e uma ação (ex: SUMMON)
+                # Agora, passamos esse comando para o engine processar
+                result = engine.processPlayerAction(command_dict["action"], command_dict)
+
+                # O engine retorna se foi sucesso ou não
+                if not result["success"]:
+                    # interface.displayError(result["reason"])
+                    print(f"Ação falhou: {result['reason']}")
+                else:
+                    # interface.displaySuccess(f"{command_dict['action']} bem-sucedido!")
+                    print(f"Ação bem-sucedida: {result['card_name']}")
+        elif actionString == "DECLARE_ATTACK":
+            attackers = engine.getAttackableMonsters(engine.turnPlayer)
+            if not attackers:
+                print("Nenhum monstro seu pode atacar.") # interface.displayMessage(...)
+                continue
+            attacker = interface.selectAttacker(attackers)
+
+            targetMonsters = engine.getAttackTargets(engine.nonTurnPlayer)
+            if not targetMonsters:
+                engine.resolveAttack(engine.turnPlayer, engine.nonTurnPlayer, attacker, None)
+                continue
+            target = interface.targetMonsterForAttack(targetMonsters)
+            battleResult = engine.resolveAttack(engine.turnPlayer, engine.nonTurnPlayer, attacker, target)
+
+
+
+
+
+
         if my_turn:
             print("\n" + "=" * 10 + " SEU TURNO " + "=" * 10)
             print(f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}")
