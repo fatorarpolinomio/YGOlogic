@@ -10,7 +10,7 @@ if typing.TYPE_CHECKING:
 
 # Classes para cada magia
 class Raigeki(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self):
         super().__init__(
             "Raigeki",
             None,
@@ -31,7 +31,7 @@ class Raigeki(Card):
 
 
 class DianKeto(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self):
         super().__init__(
             "Dian Keto, Mestre da Cura",
             None,
@@ -46,7 +46,7 @@ class DianKeto(Card):
 
 
 class PoteDaGanancia(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self):
         super().__init__(
             "Pote da Ganância", None, CardType.MAGIC, "Compre duas cartas."
         )
@@ -60,7 +60,7 @@ class PoteDaGanancia(Card):
 
 
 class TempestadePesada(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self):
         super().__init__(
             "Tempestade Pesada",
             None,

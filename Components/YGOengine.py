@@ -1,18 +1,9 @@
-from enum import Enum, auto
 from Components.YGOplayer import Player
 from Components.cards.Monsters import Monster
 from Components.cards.YGOcards import Card
+from Components.YGOgamePhase import GamePhase
 from Communication.network import Network
 from Communication.messages_protocol import MessageConstructor, MessageType
-from Components.YGOinterface import YGOinterface
-
-
-# Enum para definir os estados do jogo
-class GamePhase(Enum):
-    DRAW = auto()
-    MAIN_1 = auto()
-    BATTLE = auto()
-    END = auto()
 
 
 # Classe geral, com a lógica das ações sem inputs ou prints
@@ -105,23 +96,26 @@ class YGOengine:
         elif actionCommand == "SET_CARD":
             cardToSet = payload.get("card")
             if not cardToSet:
-                return {"success": False, "reason": "Nenhuma carta especificada."
+                return {"success": False, "reason": "Nenhuma carta especificada."}
             return self.setCard(self.turnPlayer, cardToSet)
 
         elif actionCommand == "ACTIVATE_SPELL":
             cardToActivate = payload.get("card")
             if not cardToActivate:
                 return {"success": False, "reason": "Nenhuma carta especificada."}
-            return self.activateSpell(self.turnPlayer, self.nonTurnPlayer, cardToActivate)
+            return self.activateSpell(
+                self.turnPlayer, self.nonTurnPlayer, cardToActivate
+            )
 
         elif actionCommand == "DRAW_CARD":
-            if len(self.turnPlayer.deck) == 0:
-                return {"success": False, "reason": "DECK_EMPTY"} # Se isso aqui acontecer, o jogador perde
             return self.drawCard()
 
         return {"success": False, "reason": "Comando desconhecido."}
 
     def drawCard(self):
+        if len(self.turnPlayer.deck) == 0:
+            # Se isso aqui acontecer, o jogador perde
+            return {"success": False, "reason": "DECK_EMPTY"}
         self.turnPlayer.drawCard()
         return {"success": True, "message": "Você comprou 1 carta."}
 

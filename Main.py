@@ -1,14 +1,175 @@
-from __future__ import annotations
-import typing
-
-if typing.TYPE_CHECKING:
-    from Components.YGOengine import YGOengine, GamePhase
-    from Components.YGOinterface import YGOinterface
-    from Components.YGOplayer import Player
-    from Components.cards.YGOcards import Card
-    from Components.cards.YGOcards import CardType
-
 from Communication.network import Network
+from Components.YGOinterface import YGOinterface
+from Components.YGOengine import YGOengine, GamePhase
+from Components.YGOplayer import Player
+
+
+def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
+    """
+    Prepara o jogo, cria os jogadores e troca as informações iniciais.
+    Retorna os objetos (player, opponent) prontos para o jogo
+    """
+
+    playerName = input("Digite seu nome: ")
+    player = Player(playerName, 4000)
+    player.shuffleDeck()
+    player.initialHand()
+    opponentName = ""
+
+    if is_host:
+        # espera o nome do oponente para poder criar o objeto dele
+        opponent_name_data = net.receive_message()
+        opponent_name = opponent_name_data["name"]
+        net.send_message({"name": player.name})
+
+    else:  # Se for o convidado
+        # Convidado envia seu nome primeiro
+        net.send_message({"name": playerName})
+        opponent_name_data = net.receive_message()
+        opponent_name = opponent_name_data["name"]
+
+    print(f"Seu oponente é: {opponent_name}")
+
+    opponent = Player(opponentName, 4000)
+
+    if not opponent_name:
+        print("Erro ao trocar informações com o oponente.")
+        return None, None
+
+    print(f"\n--- Jogo Iniciado: {player.name} vs {opponent.name} ---")
+
+    return player, opponent
+
+
+def run_game_loop(net, is_host, player, opponent):
+    """Executa o loop de turnos do jogo."""
+    my_turn = is_host
+    game_over = False
+
+    # Inicializando as duas classes principais:
+    engine = YGOengine(player, opponent, net, is_host)
+    interface = YGOinterface()
+
+    # loop continua enquanto o jogo não acabar
+    while not game_over:
+        if my_turn:
+            currentPlayer = engine.turnPlayer
+            currentPhase = engine.currentPhase
+
+            interface.displayPhase(
+                currentPhase.name, currentPlayer.name, engine.turnCount
+            )
+            print(
+                f"Sua Vida: {engine.turnPlayer.life} | Vida do Oponente: {engine.nonTurnPlayer.life}"
+            )
+
+            actionString = None
+
+            if currentPhase == GamePhase.DRAW:
+                actionString = "DRAW_CARD"
+                # print da fase de compra na interface
+                result = engine.processPlayerAction(actionString)
+
+                # Aqui, o cara tomou deckout, perdendo o jogo
+                if result == {"success": False, "reason": "DECK_EMPTY"}:
+                    game_over = True
+                    break
+
+                engine.advanceToNextPhase()
+                continue
+
+            if currentPhase == GamePhase.MAIN_1:
+                actionString = interface.promptMainPhaseActions(currentPlayer.name)
+
+            elif currentPhase == GamePhase.BATTLE:
+                actionString = interface.promptBattlePhaseActions(currentPlayer.name)
+
+            elif currentPhase == GamePhase.END:
+                engine.endTurn()
+                continue
+
+            if actionString in ["GO_TO_BATTLE_FASE", "END_TURN"]:
+                result = engine.processPlayerAction(actionString)
+
+            elif actionString == "VIEW_FIELD":
+                interface.viewField(engine.turnPlayer, engine.nonTurnPlayer)
+
+            elif actionString == "VIEW_GRAVEYARD":
+                interface.viewGraveyard(engine.turnPlayer)
+
+            elif actionString == "VIEW_HAND":
+                commandDict = interface.viewHand(
+                    engine.turnPlayer, engine.summonThisTurn
+                )
+                if commandDict:
+                    # O usuário selecionou uma carta e uma ação (ex: SUMMON)
+                    # Agora, passamos esse comando para o engine processar
+                    result = engine.processPlayerAction(
+                        commandDict["action"], commandDict
+                    )
+
+                    # O engine retorna se foi sucesso ou não
+                    if not result["success"]:
+                        # interface.displayError(result["reason"])
+                        print(f"Ação falhou: {result['reason']}")
+                    else:
+                        # interface.displaySuccess(f"{command_dict['action']} bem-sucedido!")
+                        print(f"Ação bem-sucedida: {result['card_name']}")
+
+            elif actionString == "DECLARE_ATTACK":
+                attackers = engine.getAttackableMonsters(engine.turnPlayer)
+                if not attackers:
+                    print(
+                        "Nenhum monstro seu pode atacar."
+                    )  # interface.displayMessage(...)
+                    continue
+                    attacker = interface.selectAttacker(attackers)
+
+                targetMonsters = engine.getAttackTargets(engine.nonTurnPlayer)
+                if not targetMonsters:
+                    engine.resolveAttack(
+                        engine.turnPlayer, engine.nonTurnPlayer, attacker, None
+                    )
+                    continue
+                    target = interface.targetMonsterForAttack(targetMonsters)
+                    battleResult = engine.resolveAttack(
+                        engine.turnPlayer, engine.nonTurnPlayer, attacker, target
+                    )
+        else:
+            print("\nAguardando jogada do oponente...")
+
+            received_message = net.receive_message()
+            if not received_message:
+                print("Oponente desconectado.")
+                game_over = True
+                continue
+
+            # engine.processNetworkAction(received_message)
+
+            if received_message.get("tipo") == "END_TURN":
+                print("Oponente encerrou o turno.")
+                # O engine do oponente já trocou os jogadores.
+                # Agora o *seu* engine local precisa fazer o mesmo.
+                engine.endTurn()
+                my_turn = True  # AGORA É O SEU TURNO
+                continue
+        # condição de vitória/derrota por pontos de vida
+        if engine.turnPlayer.life <= 0 or engine.nonTurnPlayer.life <= 0:
+            game_over = True
+
+    # Lógica de Fim de Jogo
+    print("\n--- FIM DE JOGO ---")
+    if engine.turnPlayer.life <= 0:
+        print("Você perdeu!")
+    elif engine.nonTurnPlayer.life <= 0:
+        print("Você venceu!")
+    elif len(engine.turnPlayer.deck) == 0:
+        print("Você perdeu! (deckout)")
+    elif len(engine.nonTurnPlayer.deck) == 0:
+        print("Você venceu! (deckout do oponente)")
+    else:
+        # se ninguém perdeu por pontos de vida, o jogo terminou por desconexão ou desistência
+        print("A partida foi encerrada.")
 
 
 def main():
@@ -53,164 +214,3 @@ def main():
 # só pra main() ser executada quando o arq. é executado como programa principal
 if __name__ == "__main__":
     main()
-
-
-def setup_game(net, is_host):
-    """
-    Prepara o jogo, cria os jogadores e troca as informações iniciais.
-    Retorna os objetos (player, opponent) prontos para o jogo
-    """
-    if is_host:
-        player_name = input("Digite seu nome: ")
-
-        player = Player(player_name, 4000)
-        player.shuffleDeck()
-        player.initialHand()
-
-        # espera o nome do oponente para poder criar o objeto dele
-        opponent_name_data = net.receive_message()
-        opponent_name = opponent_name_data["name"]
-        net.send_message({"name": player.name})
-
-        opponent = Player(opponent_name, 4000)
-        opponent.shuffleDeck()
-        opponent.initialHand()
-
-        print(f"Você ({player.name}) vs {opponent.name}")
-        print(f"Sua mão inicial (Anfitrião): {player.hand}")
-
-        # enviando a mão inicial para o oponente
-        print("Enviando mão inicial para o oponente...")
-        mao_oponente_em_dict = [card.to_dict() for card in opponent.hand]
-
-        setup_message = {"tipo": "SETUP_JOGO", "sua_mao": mao_oponente_em_dict}
-        net.send_message(setup_message)
-
-    else:  # Se for o convidado
-        player_name = input("Digite seu nome: ")
-        net.send_message({"name": player_name})
-        opponent_name_data = net.receive_message()
-        opponent_name = opponent_name_data["name"]
-
-        # cria os objetos de jogador com mãos e decks vazios por enquanto
-        player = Player(player_name, 4000)
-        opponent = Player(opponent_name, 4000)
-
-        print(f"Você ({player.name}) vs {opponent.name}")
-
-        # recebe e processa a mão inicial do anfitrião
-        print("Aguardando o anfitrião enviar sua mão inicial...")
-        setup_data = net.receive_message()
-
-        if setup_data and setup_data.get("tipo") == "SETUP_JOGO":
-            mao_recebida_em_dict = setup_data["sua_mao"]
-
-            # Limpa a mão (caso já tenha algo) e a preenche com as cartas recebidas
-            player.hand = []
-            for carta_dict in mao_recebida_em_dict:
-                # recria o objeto Card a partir do dicionário recebido via JSON
-                nova_carta = Card(
-                    name=carta_dict["name"],
-                    ATK=carta_dict["ATK"],
-                    DEF=carta_dict["DEF"],
-                    # converte a string de volta para o tipo Enum correto
-                    type=CardType[carta_dict["type"]],
-                    effect=carta_dict["effect"],
-                )
-                player.hand.append(nova_carta)
-
-            print(f"Mão recebida! Sua mão (Convidado): {player.hand}")
-        else:
-            print("Erro ao receber dados de setup do anfitrião.")
-            return None, None  # retorna None para indicar que o setup falhou
-
-    return player, opponent
-
-
-def run_game_loop(net, is_host, player, opponent):
-    """Executa o loop de turnos do jogo."""
-    my_turn = is_host
-    game_over = False
-
-    # Inicializando as duas classes principais:
-    engine = YGOengine(player, opponent, net, is_host)
-    interface = YGOinterface()
-
-    # loop continua enquanto o jogo não acabar
-    while not game_over:
-        currentPlayer = engine.turnPlayer
-        currentPhase = engine.currentPhase
-
-        interface.displayPhase(currentPhase.name, currentPlayer.name, engine.turnCount)
-        print(
-            f"Sua Vida: {engine.turnPlayer.life} | Vida do Oponente: {engine.nonTurnPlayer.life}"
-        )
-
-        if currentPhase == GamePhase.DRAW:
-            # print da fase de compra na interface
-            # drawCard na engine
-            engine.advanceToNextPhase()
-            continue
-
-        actionString = None
-        if currentPhase == GamePhase.MAIN_1:
-            actionString = interface.promptMainPhaseActions(currentPlayer.name)
-        elif currentPhase == GamePhase.BATTLE:
-            actionString = interface.promptBattlePhaseActions(currentPlayer.name)
-        elif currentPhase == GamePhase.END:
-            engine.endTurn()
-            continue
-
-        if actionString in ["GO_TO_BATTLE_FASE", "END_TURN"]:
-            result = engine.processPlayerAction(actionString)
-        elif actionString == "VIEW_FIELD":
-            interface.viewField(engine.turnPlayer, engine.nonTurnPlayer)
-        elif actionString == "VIEW_GRAVEYARD":
-            interface.viewGraveyard(engine.turnPlayer)
-        elif actionString == "VIEW_HAND":
-            commandDict = interface.viewHand(engine.turnPlayer, engine.summonThisTurn)
-            if commandDict:
-                # O usuário selecionou uma carta e uma ação (ex: SUMMON)
-                # Agora, passamos esse comando para o engine processar
-                result = engine.processPlayerAction(commandDict["action"], commandDict)
-
-                # O engine retorna se foi sucesso ou não
-                if not result["success"]:
-                    # interface.displayError(result["reason"])
-                    print(f"Ação falhou: {result['reason']}")
-                else:
-                    # interface.displaySuccess(f"{command_dict['action']} bem-sucedido!")
-                    print(f"Ação bem-sucedida: {result['card_name']}")
-        elif actionString == "DECLARE_ATTACK":
-            attackers = engine.getAttackableMonsters(engine.turnPlayer)
-            if not attackers:
-                print(
-                    "Nenhum monstro seu pode atacar."
-                )  # interface.displayMessage(...)
-                continue
-            attacker = interface.selectAttacker(attackers)
-
-            targetMonsters = engine.getAttackTargets(engine.nonTurnPlayer)
-            if not targetMonsters:
-                engine.resolveAttack(
-                    engine.turnPlayer, engine.nonTurnPlayer, attacker, None
-                )
-                continue
-            target = interface.targetMonsterForAttack(targetMonsters)
-            battleResult = engine.resolveAttack(
-                engine.turnPlayer, engine.nonTurnPlayer, attacker, target
-            )
-
-        # condição de vitória/derrota por pontos de vida
-        if engine.turnPlayer.life <= 0 or engine.nonTurnPlayer.life <= 0:
-            game_over = True
-
-        # Lógica de Fim de Jogo
-        print("\n--- FIM DE JOGO ---")
-        if player.life <= 0:
-            print("Você perdeu!")
-        elif opponent.life <= 0:
-            print("Você venceu!")
-        else:
-            # se ninguém perdeu por pontos de vida, o jogo terminou por desconexão ou desistência
-            print("A partida foi encerrada.")

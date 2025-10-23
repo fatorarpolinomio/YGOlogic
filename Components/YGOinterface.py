@@ -2,8 +2,6 @@ import Components.YGOplayer as player
 from Components.cards.Monsters import Monster
 import Components.cards.YGOcards as cards
 from Components.cards.YGOcards import CardType
-from Components.YGOengine import YGOengine
-from Components.YGOengine import GamePhase
 
 
 class YGOinterface:
