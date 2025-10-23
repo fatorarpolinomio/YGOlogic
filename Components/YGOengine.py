@@ -21,7 +21,7 @@ class YGOengine:
         self,
         player1: Player,
         player2: Player,
-        network: Network = None,
+        network: Network,
         is_host: bool = True,
     ):
         self.player1 = player1
@@ -83,26 +83,18 @@ class YGOengine:
         self.summonThisTurn = False  # Agora, o dono do turno pode invocar
         self.currentPhase = GamePhase.DRAW  # Começa comprando uma
 
+    # Usado para ações que mudam o estado do jogo
     def processPlayerAction(self, actionCommand: str, payload: dict = None) -> dict:
         if actionCommand == "GO_TO_BATTLE_PHASE":
             self.currentPhase = GamePhase.BATTLE
-            return {"message": "Iniciando a Fase de Batalha."}
+            return {"success": True, "message": "Iniciando a Fase de Batalha."}
 
         elif actionCommand == "END_TURN":
-            self.runTurn()
-            return {"message": "Encerrando o turno."}
+            self.endTurn()
+            return {"success": True, "message": "Turno encerrado. Próximo jogador."}
 
         elif actionCommand == "DECLARE_ATTACK":
             return {"message": "Declarando ataque."}
-
-        elif actionCommand == "VIEW_HAND":
-            return {"message": "Ver mão."}
-
-        elif actionCommand == "VIEW_FIELD":
-            return {"message": "Ver campo."}
-
-        elif actionCommand == "VIEW_GRAVEYARD":
-            return {"message": "Ver cemitério."}
 
         elif actionCommand == "SUMMON_MONSTER":
             monsterToSummon = payload.get("card")
@@ -111,17 +103,27 @@ class YGOengine:
             return self.summonMonster(self.turnPlayer, monsterToSummon)
 
         elif actionCommand == "SET_CARD":
-            cardToSet = payload.get("spellTrap")
+            cardToSet = payload.get("card")
+            if not cardToSet:
+                return {"success": False, "reason": "Nenhuma carta especificada."
             return self.setCard(self.turnPlayer, cardToSet)
 
         elif actionCommand == "ACTIVATE_SPELL":
-            cardToActivate = payload.get("spell")
-            return self.activateSpell(self.turnPlayer, self.nonTurnPlayer, spell)
+            cardToActivate = payload.get("card")
+            if not cardToActivate:
+                return {"success": False, "reason": "Nenhuma carta especificada."}
+            return self.activateSpell(self.turnPlayer, self.nonTurnPlayer, cardToActivate)
 
-        elif actionCommand == "DECLARE_ATTACK":
-            pass
+        elif actionCommand == "DRAW_CARD":
+            if len(self.turnPlayer.deck) == 0:
+                return {"success": False, "reason": "DECK_EMPTY"} # Se isso aqui acontecer, o jogador perde
+            return self.drawCard()
 
         return {"success": False, "reason": "Comando desconhecido."}
+
+    def drawCard(self):
+        self.turnPlayer.drawCard()
+        return {"success": True, "message": "Você comprou 1 carta."}
 
     # Métodos para MainPhase
     # Eu posso:
