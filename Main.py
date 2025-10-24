@@ -206,7 +206,7 @@ def run_game_loop(net, is_host, player, opponent):
             #         engine.processar_resultado_batalha_oponente(received_message)
 
             # engine.processNetworkAction(received_message)
-            received_message = net.receive_message()
+            engine.receive_network_message(received_message)
 
             if received_message.get("tipo") == "PASSAR_TURNO":
                 print("Oponente encerrou o turno.")

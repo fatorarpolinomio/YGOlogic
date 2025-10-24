@@ -39,6 +39,15 @@ class YGOengine:
             return success
         return False
 
+    def receive_network_message(self, message):
+        "Função auxiliar para receber mensagens pela rede"
+        if self.network and self.network.is_connected:
+            success = self.network.receive_message(message)
+            if not success:
+                print("Falha ao receber mensagem pela rede")
+            return success
+        return False
+
     def advanceToNextPhase(self):
         """Avança o jogo para a próxima fase lógica."""
         if self.currentPhase == GamePhase.DRAW:
@@ -318,10 +327,7 @@ class YGOengine:
             else None
         )
         message = MessageConstructor.declarar_ataque(
-            attacker_index=attacker_idx,
-            attacker_name=attackerMonster.name,
-            attacker_atk=attackerMonster.ATK,
-            target_index=target_idx,
+            atacante_index=attacker_idx, defensor_index=target_idx
         )
         self.send_network_message(message)
 
