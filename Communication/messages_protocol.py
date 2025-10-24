@@ -4,8 +4,7 @@ from __future__ import annotations
 import typing
 from typing import Dict, Any, List, Optional
 
-if typing.TYPE_CHECKING:
-    from Components.YGOplayer import GamePhase
+from Components.YGOgamePhase import GamePhase
 
 
 class MessageType:

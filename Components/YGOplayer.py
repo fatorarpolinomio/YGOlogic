@@ -43,6 +43,8 @@ class Player:
         if spellTrap in self.spellsAndTrapsInField:
             self.spellsAndTrapsInField.remove(spellTrap)
             self.graveyard.append(spellTrap)
+            return
+        self.graveyard.append(spellTrap)
 
     # Comprar cartas
     def drawCard(self):

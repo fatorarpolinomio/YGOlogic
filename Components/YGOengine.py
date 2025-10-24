@@ -1,7 +1,8 @@
 from Components.YGOplayer import Player
 from Components.cards.Monsters import Monster
-from Components.cards.YGOcards import Card
+from Components.cards.YGOcards import Card, CardType
 from Components.YGOgamePhase import GamePhase
+import Components.cards.Traps
 from Communication.network import Network
 from Communication.messages_protocol import MessageConstructor, MessageType
 
@@ -86,7 +87,7 @@ class YGOengine:
     # Usado para ações que mudam o estado do jogo
     def processPlayerAction(self, actionCommand: str, payload: dict = None) -> dict:
         if actionCommand == "GO_TO_BATTLE_PHASE":
-            self.currentPhase = GamePhase.BATTLE
+            self.advanceToNextPhase()
             return {"success": True, "message": "Iniciando a Fase de Batalha."}
 
         elif actionCommand == "END_TURN":
@@ -194,11 +195,11 @@ class YGOengine:
             return {"success": False, "reason": "SPELL_TRAP_ZONE_FULL"}
 
         # Remove da mão (se ainda estiver lá)
-        if spell in player.hand:
-            card_index = player.hand.index(spell)
-            player.hand.remove(spell)
+
+        card_index = player.hand.index(spell)
 
         spell.apply_effect(player, opponent)  # aplica o efeito
+        player.hand.remove(spell)
         player.spellTrapIntoGraveyard(spell)  # move para o cemitério
 
         # Envia mensagem
@@ -245,6 +246,24 @@ class YGOengine:
 
         return {"success": True, "card_name": trap.name}
 
+    def checkForTrapResponse(self, attacker_monster: Monster):
+        """
+        Verifica se o jogador defensor tem armadilhas que podem ser ativadas
+        em resposta a este ataque.
+        """
+        valid_traps = []
+        for trap in self.turnPlayer.spellsAndTrapsInField:
+            if trap.type == CardType.TRAP:
+                # Armadilha como Cilindro ou Buraco precisam saber QUEM está atacando
+                if hasattr(trap, "attackingMonster"):
+                    trap.attackingMonster = attacker_monster  #
+                valid_traps.append(trap)
+
+        if not valid_traps:
+            return None  # Nenhuma armadilha para ativar
+
+        return valid_traps
+
     # Retorna uma lista de monstros que podem atacar
     def getAttackableMonsters(self, player: Player) -> list[Monster]:
         return [m for m in player.monstersInField if m.canAttack]
@@ -256,6 +275,15 @@ class YGOengine:
     # Calcula o resultado de uma batalha sem alterar o estado do jogo.
     # Retorna um dicionário com os danos e quais monstros são destruídos.
     def damageCalc(self, atkMonter: Monster, targetMonster: Monster):
+        # Isso aqui é para ataque direto
+        if targetMonster == None:
+            return {
+                "playerDamage": 0,
+                "opponentDamage": atkMonter.ATK,
+                "attackerDestroyed": False,
+                "targetDestroyed": False,
+            }
+
         attackDifference = atkMonter.ATK - targetMonster.ATK
 
         playerDamage = 0
@@ -291,38 +319,75 @@ class YGOengine:
         if not attackerMonster.canAttack:
             return  # Ou envia uma mensagem de erro para o cliente
 
-        # Futuramente: Aqui é o ponto para o oponente responder (enviar mensagem de 'ativar armadilha?')
-
-        results = self.damageCalc(attackerMonster, targetMonster)
-
-        # Aplica os danos
-        attackingPlayer.life -= results["playerDamage"]
-        defendingPlayer.life -= results["opponentDamage"]
-
-        # Atualiza status do monstro atacante
-        attackerMonster.canAttack = False
-
-        # pegando índices antes de mover para o cemitério (é necessário para mensagem)
+        # 1. Envia a declaração de ataque e ESPERA a resposta
         attacker_idx = attackingPlayer.monstersInField.index(attackerMonster)
-        target_idx = defendingPlayer.monstersInField.index(targetMonster)
-
-        # Move monstros destruídos para o cemitério
-        if results["attackerDestroyed"]:
-            attackingPlayer.monsterIntoGraveyard(attackerMonster)
-
-        if results["targetDestroyed"]:
-            defendingPlayer.monsterIntoGraveyard(targetMonster)
-
-        # envia resultado da batalha
-        message = MessageConstructor.resultado_batalha(
-            dano_ao_atacante=results["playerDamage"],
-            dano_ao_defensor=results["opponentDamage"],
-            monstro_atacante_destruido=results["attackerDestroyed"],
-            monstro_defensor_destruido=results["targetDestroyed"],
-            atacante_index=attacker_idx,
-            defensor_index=target_idx,
+        target_idx = (
+            defendingPlayer.monstersInField.index(targetMonster)
+            if targetMonster
+            else None
+        )
+        message = MessageConstructor.declarar_ataque(
+            atacante_index=attacker_idx, defensor_index=target_idx
         )
         self.send_network_message(message)
 
-        # retorna o resultado para que o servidor possa enviá-lo a ambos os clientes
-        return results
+        # AQUI O JOGO DO ATACANTE "CONGELA" ATÉ RECEBER A RESPOSTA
+        response_message = self.network.receive_message()
+
+        if (
+            response_message
+            and response_message.get("tipo") == "RESPOSTA_ARMADILHA"
+            and response_message.get("ativar") == True
+        ):
+            trap_name = response_message.get("trap_name")
+
+            if trap_name == "Cilindro Mágico":
+                attackingPlayer.life -= attackerMonster.ATK
+            elif trap_name == "Força do Espelho":
+                Components.cards.Traps.MirrorForce(defendingPlayer, attackingPlayer)
+            elif trap_name == "Buraco Armadilha":
+                attackingPlayer.monsterIntoGraveyard(attackerMonster)
+            elif trap_name == "Aparelho de Evacuação Obrigatória":
+                if attackerMonster in attackingPlayer.monstersInField:
+                    attackingPlayer.monstersInField.remove(attackerMonster)
+                attackingPlayer.hand.append(attackerMonster)
+
+            # Marcar o monstro como tendo atacado (mesmo que negado)
+            attackerMonster.canAttack = False
+            return {"attack_negated": True, "trap_name": trap_name}
+
+        else:
+            results = self.damageCalc(attackerMonster, targetMonster)
+
+            # Aplica os danos
+            attackingPlayer.life -= results["playerDamage"]
+            defendingPlayer.life -= results["opponentDamage"]
+
+            # Atualiza status do monstro atacante
+            attackerMonster.canAttack = False
+
+            if targetMonster != None:
+                # pegando índices antes de mover para o cemitério (é necessário para mensagem)
+
+                target_idx = defendingPlayer.monstersInField.index(targetMonster)
+
+                # Move monstros destruídos para o cemitério
+                if results["attackerDestroyed"]:
+                    attackingPlayer.monsterIntoGraveyard(attackerMonster)
+
+                if results["targetDestroyed"]:
+                    defendingPlayer.monsterIntoGraveyard(targetMonster)
+
+                # envia resultado da batalha
+                message = MessageConstructor.resultado_batalha(
+                    dano_ao_atacante=results["playerDamage"],
+                    dano_ao_defensor=results["opponentDamage"],
+                    monstro_atacante_destruido=results["attackerDestroyed"],
+                    monstro_defensor_destruido=results["targetDestroyed"],
+                    atacante_index=attacker_idx,
+                    defensor_index=target_idx,
+                )
+                self.send_network_message(message)
+
+                # retorna o resultado para que o servidor possa enviá-lo a ambos os clientes
+                return results

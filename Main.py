@@ -1,7 +1,10 @@
+from turtle import clear
 from Communication.network import Network
+from Communication.messages_protocol import MessageConstructor
 from Components.YGOinterface import YGOinterface
 from Components.YGOengine import YGOengine, GamePhase
 from Components.YGOplayer import Player
+import os
 
 
 def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
@@ -31,6 +34,8 @@ def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
     print(f"Seu oponente é: {opponent_name}")
 
     opponent = Player(opponentName, 4000)
+    opponent.shuffleDeck()
+    opponent.initialHand()
 
     if not opponent_name:
         print("Erro ao trocar informações com o oponente.")
@@ -54,10 +59,9 @@ def run_game_loop(net, is_host, player, opponent):
     while not game_over:
         if my_turn:
             currentPlayer = engine.turnPlayer
-            currentPhase = engine.currentPhase
 
             interface.displayPhase(
-                currentPhase.name, currentPlayer.name, engine.turnCount
+                engine.currentPhase.name, currentPlayer.name, engine.turnCount
             )
             print(
                 f"Sua Vida: {engine.turnPlayer.life} | Vida do Oponente: {engine.nonTurnPlayer.life}"
@@ -65,7 +69,7 @@ def run_game_loop(net, is_host, player, opponent):
 
             actionString = None
 
-            if currentPhase == GamePhase.DRAW:
+            if engine.currentPhase == GamePhase.DRAW:
                 actionString = "DRAW_CARD"
                 # print da fase de compra na interface
                 result = engine.processPlayerAction(actionString)
@@ -78,17 +82,17 @@ def run_game_loop(net, is_host, player, opponent):
                 engine.advanceToNextPhase()
                 continue
 
-            if currentPhase == GamePhase.MAIN_1:
+            if engine.currentPhase == GamePhase.MAIN_1:
                 actionString = interface.promptMainPhaseActions(currentPlayer.name)
 
-            elif currentPhase == GamePhase.BATTLE:
+            elif engine.currentPhase == GamePhase.BATTLE:
                 actionString = interface.promptBattlePhaseActions(currentPlayer.name)
 
-            elif currentPhase == GamePhase.END:
+            elif engine.currentPhase == GamePhase.END:
                 engine.endTurn()
                 continue
 
-            if actionString in ["GO_TO_BATTLE_FASE", "END_TURN"]:
+            if actionString in ["GO_TO_BATTLE_PHASE", "END_TURN"]:
                 result = engine.processPlayerAction(actionString)
 
             elif actionString == "VIEW_FIELD":
@@ -119,19 +123,27 @@ def run_game_loop(net, is_host, player, opponent):
             elif actionString == "DECLARE_ATTACK":
                 attackers = engine.getAttackableMonsters(engine.turnPlayer)
                 if not attackers:
-                    print(
-                        "Nenhum monstro seu pode atacar."
-                    )  # interface.displayMessage(...)
+                    print("Nenhum monstro seu pode atacar.")
                     continue
-                    attacker = interface.selectAttacker(attackers)
+                attacker = interface.selectAttacker(attackers)
+
+                if attacker is None:
+                    print("Ataque cancelado.")
+                    continue
 
                 targetMonsters = engine.getAttackTargets(engine.nonTurnPlayer)
+
+                target = None
                 if not targetMonsters:
                     engine.resolveAttack(
                         engine.turnPlayer, engine.nonTurnPlayer, attacker, None
                     )
                     continue
+                else:
                     target = interface.targetMonsterForAttack(targetMonsters)
+                    if target is None:
+                        print("Seleção de alvo cancelada.")
+                        continue
                     battleResult = engine.resolveAttack(
                         engine.turnPlayer, engine.nonTurnPlayer, attacker, target
                     )
@@ -144,16 +156,61 @@ def run_game_loop(net, is_host, player, opponent):
                 game_over = True
                 continue
 
+            if received_message.get("tipo") == "DECLARAR_ATAQUE":
+                print("Oponente declarou um ataque!")
+                # Pega os monstros envolvidos (do ponto de vista do defensor)
+                attacker_idx = received_message.get("atacante_index")
+                target_idx = received_message.get("defensor_index")
+
+                attacker_monster = engine.nonTurnPlayer.monstersInField[attacker_idx]
+                target_monster = (
+                    engine.turnPlayer.monstersInField[target_idx]
+                    if target_idx is not None
+                    else None
+                )
+
+                # 1. Pergunta ao engine do defensor se há armadilhas
+                valid_traps = engine.checkForTrapResponse(attacker_monster)
+
+                trap_to_activate = None
+                if valid_traps:
+                    # 2. Se houver, pergunta ao jogador defensor (via interface)
+                    trap_to_activate = interface.promptTrapActivation(
+                        valid_traps, attacker_monster
+                    )
+
+                # 3. Envia a resposta de volta ao atacante
+                if trap_to_activate:
+                    # Ativa a armadilha localmente
+                    engine.activateTrap(
+                        engine.turnPlayer, engine.nonTurnPlayer, trap_to_activate
+                    )  #
+
+                    # Envia a resposta "SIM"
+                    message = MessageConstructor.resposta_armadilha(
+                        ativar=True, trap_name=trap_to_activate.name
+                    )
+                    net.send_message(message)
+                else:
+                    # Envia a resposta "NÃO"
+                    message = MessageConstructor.resposta_armadilha(ativar=False)
+                    net.send_message(message)
+
+                continue
+
+            # (Adicionar um handler para a mensagem "RESULTADO_BATALHA" aqui)
+            # ex: elif received_message.get("tipo") == "RESULTADO_BATALHA":
+            #         engine.processar_resultado_batalha_oponente(received_message)
+
             # engine.processNetworkAction(received_message)
             engine.receive_network_message(received_message)
 
             if received_message.get("tipo") == "END_TURN":
                 print("Oponente encerrou o turno.")
-                # O engine do oponente já trocou os jogadores.
-                # Agora o *seu* engine local precisa fazer o mesmo.
                 engine.endTurn()
-                my_turn = True  # AGORA É O SEU TURNO
+                my_turn = True
                 continue
+
         # condição de vitória/derrota por pontos de vida
         if engine.turnPlayer.life <= 0 or engine.nonTurnPlayer.life <= 0:
             game_over = True
@@ -171,6 +228,13 @@ def run_game_loop(net, is_host, player, opponent):
     else:
         # se ninguém perdeu por pontos de vida, o jogo terminou por desconexão ou desistência
         print("A partida foi encerrada.")
+
+
+def clear_screen():
+    if os.name == "nt":
+        os.system("cls")
+    else:
+        os.system("clear")
 
 
 def main():
