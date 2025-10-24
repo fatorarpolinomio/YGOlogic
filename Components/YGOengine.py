@@ -325,12 +325,16 @@ class YGOengine:
         )
         self.send_network_message(message)
 
+        print("Aguardando resposta do oponente...")
+        response_message = None
+        while response_message is None:
+            response_message = self.network.get_message()
         # AQUI O JOGO DO ATACANTE "CONGELA" ATÉ RECEBER A RESPOSTA
         response_message = self.network.receive_message()
 
         if (
             response_message
-            and response_message.get("tipo") == "RESPOSTA_ARMADILHA"
+            and response_message.get("tipo") == MessageType.ATIVAR_ARMADILHA
             and response_message.get("ativar") == True
         ):
             trap_name = response_message.get("trap_name")

@@ -150,7 +150,7 @@ def run_game_loop(net, is_host, player, opponent):
         else:
             print("\nAguardando jogada do oponente...")
 
-            received_message = net.receive_message()
+            received_message = net.get_message()
             if not received_message:
                 print("Oponente desconectado.")
                 game_over = True
@@ -205,7 +205,7 @@ def run_game_loop(net, is_host, player, opponent):
             # engine.processNetworkAction(received_message)
             received_message = net.receive_message()
 
-            if received_message.get("tipo") == "END_TURN":
+            if received_message.get("tipo") == "PASSAR_TURNO":
                 print("Oponente encerrou o turno.")
                 engine.endTurn()
                 my_turn = True

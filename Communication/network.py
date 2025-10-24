@@ -1,5 +1,7 @@
 import socket
 import json
+import threading
+from queue import Queue, Empty
 from typing import Dict, Any, Optional
 from Communication.messages_protocol import MessageType   
 
@@ -11,6 +13,22 @@ class Network:
         self.conn = None
         # flag para rastrear estado da conexão
         self.is_connected = False
+
+        
+        # fila thread-safe para armazenar mensagens recebidas
+        # a thread de recebimento 'coloca' (put) mensagens aqui
+        # a thread principal (jogo) 'obtém' (get) mensagens daqui
+        self.message_queue: Queue[Dict[str, Any]] = Queue()
+        
+        # variável para armazenar a thread de recebimento
+        self.receiver_thread: Optional[threading.Thread] = None
+
+    def _start_receiver_thread(self):
+        "Inicia a thread de recebimento em background."
+        if self.receiver_thread is None:
+            # daemon=True garante que a thread feche se o programa principal fechar
+            self.receiver_thread = threading.Thread(target=self.listen_for_messages, daemon=True)
+            self.receiver_thread.start()
 
     def host_game(self, host, port):
         "Configura o jogador como anfitrião (servidor) e espera por uma conexão"
@@ -24,11 +42,13 @@ class Network:
             self.conn, addr = self.socket.accept()
             self.is_connected = True 
             print(f"Oponente {addr} se conectou.")
+            # inicia a thread de recebimento
+            self._start_receiver_thread()
             return True # true se a conexão foi bem sucedida
         except socket.error as e:
             print(f"Erro ao hospedar o jogo: {e}")
             return False #False se ocorreu um erro
-
+    
     def connect_to_game(self, host, port):
         "Configura o jogador como convidado (cliente) e tenta se conectar ao anfitrião"
         try:
@@ -38,10 +58,56 @@ class Network:
             self.conn = self.socket
             self.is_connected = True
             print("Conectado ao anfitrião!")
+            self._start_receiver_thread()
             return True 
         except socket.error as e:
             print(f"Erro ao conectar: {e}")
-            return False 
+            return False
+        
+    def listen_for_messages(self):
+        """
+        Função alvo da thread. Fica em loop recebendo mensagens.
+        Este é o ÚNICO lugar que chama self.receive_message()
+        """
+        print("[Network Thread] Thread de recebimento iniciada.")
+        while self.is_connected:
+            try:
+                # receive_message() é bloqueante, mas está em sua própria thread,
+                # então não trava o loop principal do jogo.
+                message = self.receive_message()
+                
+                if message:
+                    # Adiciona a mensagem na fila para a thread principal processar
+                    self.message_queue.put(message)
+                else:
+                    # receive_message() retorna None se a conexão for perdida
+                    if self.is_connected:
+                        print("[Network Thread] Conexão perdida. Encerrando.")
+                        self.is_connected = False
+                        # Envia uma mensagem de SAIR para o loop do jogo saber
+                        self.message_queue.put({"tipo": MessageType.SAIR, "reason": "Connection lost"})
+                    break # Sai do loop
+            except Exception as e:
+                if self.is_connected:
+                    print(f"[Network Thread] Erro inesperado: {e}")
+                    self.is_connected = False
+                    self.message_queue.put({"tipo": MessageType.SAIR, "reason": "Network error"})
+                break
+        print("[Network Thread] Thread de recebimento finalizada.")
+
+    # --- NOVO MÉTODO ---
+    def get_message(self) -> Optional[Dict[str, Any]]:
+        """
+        Obtém uma mensagem da fila de forma NÃO-BLOQUEANTE.
+        Este método deve ser chamado pelo loop principal do jogo.
+        """
+        try:
+            # get_nowait() levanta uma exceção 'Empty' se a fila estiver vazia
+            return self.message_queue.get_nowait()
+        except Empty:
+            # Isso é normal, significa que não há novas mensagens
+            return None
+             
 
     def send_message(self, message: Dict[str, Any]):
         "Envia uma mensagem estruturada pela rede e retorna False se a conexão falhar"
@@ -71,7 +137,7 @@ class Network:
             print(f"Erro de conexão ao enviar mensagem: {e}")
             return False 
         except (TypeError, ValueError) as e:
-            print(f"❌ Erro ao serializar mensagem: {e}")
+            print(f"Erro ao serializar mensagem: {e}")
             return False
 
     def receive_message(self, timeout: Optional[float] = None):
@@ -134,19 +200,24 @@ class Network:
                     return None
                 data += chunk
             except socket.error as e:
+                # acontecerá se self.close() for chamado por outra thread
                 return None
         return data
             
     def close(self):
-        "fecha todas as conexões ativas de forma segura"
+        "fecha todas as conexões ativas de forma segura e a thread de recebimento"
         print("Fechando conexões...")
+        if not self.is_connected:
+            return
         self.is_connected = False
         # O anfitrião tem um 'conn' separado do 'socket' principal
         # convidado usa o 'socket' principal como 'conn', então a verificação é importante
         if self.conn and self.conn is not self.socket:
             try:
-                # shutdown para n permitir mais send/receive
+                # shutdown para nao permitir mais send/receive
                 self.conn.shutdown(socket.SHUT_RDWR)
+            except socket.error:
+                pass # ignora erros se já estiver fechado
                 self.conn.close()
                 print("Conexão fechada")
             except socket.error as e:
@@ -154,7 +225,24 @@ class Network:
         
         # fecha o socket principal
         try:
-            self.socket.shutdown(socket.SHUT_RDWR)
+            if self.socket.fileno() != -1:
+                self.socket.shutdown(socket.SHUT_RDWR)
+        except (socket.error, OSError):
+            pass  # Ignora erro se não estiver conectado
+        try:
             self.socket.close()
+            print("Socket principal fechado.")
         except socket.error as e:
             print(f"Erro ao fechar o socket principal: {e}")
+        
+        # aguarda a thread de recebimento finalizar
+        if self.receiver_thread and self.receiver_thread.is_alive():
+            print("Aguardando thread de recebimento finalizar...")
+            self.receiver_thread.join(timeout=3.0) # espera no máximo 3s
+            if self.receiver_thread.is_alive():
+                print("Aviso: Thread de recebimento não finalizou a tempo.")
+            else:
+                print("Thread de recebimento finalizada com sucesso.")
+        
+        self.receiver_thread = None
+        self.conn = None
