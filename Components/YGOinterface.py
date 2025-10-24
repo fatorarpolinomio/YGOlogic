@@ -51,12 +51,21 @@ class YGOinterface:
         print(f"\n--- Turno {turnCount} para {playerName} ---")
         print(f"Fase: {phaseName}")
 
+    def showSummonedMonster(cardName: str):
+        print(f"Você invocou: {cardName}!")
+
     def cardAction(self, card: cards.Card, playerCanSummon: bool) -> dict | None:
         """
         Mostra as ações para uma carta e retorna um "comando" representando a escolha do jogador.
         NÃO executa a ação, apenas pergunta.
         """
-        print(f"\n Carta Selecionada: {card.name}")
+        print(f"\nCarta Selecionada: {card.name}")
+
+        if card.effectDescription != "":
+            print("\nEfeito da carta:")
+
+            print(f"\n{card.effectDescription}")
+            print()
 
         options = {}
         option_index = 1
