@@ -17,14 +17,14 @@ standardDeck = [
     Monster("Kaiser Violento", 1800, CardType.MONSTER, ""),  # nível 5
     Monster("Caveira Invocada", 2500, CardType.MONSTER, ""),  # nível 6
     # Magic
-    Spells.Raigeki,
-    Spells.DianKeto,
-    Spells.PoteDaGanancia,
-    Spells.TempestadePesada,
+    Spells.Raigeki(),
+    Spells.DianKeto(),
+    Spells.PoteDaGanancia(),
+    Spells.TempestadePesada(),
     # Traps
-    Traps.MirrorForce,
-    Traps.Cilindro,
-    Traps.BuracoArmadilha,
-    Traps.Aparelho,
-    Traps.NegateAttack,
+    Traps.MirrorForce(),
+    Traps.Cilindro(),
+    Traps.BuracoArmadilha(),
+    Traps.Aparelho(),
+    Traps.NegateAttack(),
 ]

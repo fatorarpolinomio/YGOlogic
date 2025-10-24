@@ -1,11 +1,9 @@
 from __future__ import annotations
-from contextlib import AsyncExitStack
+
 from Components.cards.YGOcards import Card, CardType
 from Components.cards.Monsters import Monster
 import typing
 from typing import override
-from enum import Enum
-from abc import ABC, abstractmethod
 
 if typing.TYPE_CHECKING:
     from Components.YGOplayer import Player
@@ -13,7 +11,7 @@ if typing.TYPE_CHECKING:
 
 # Classes para cada armadilha
 class MirrorForce(Card):
-    def __init__(self, name, ATK, type, effect):
+    def __init__(self):
         super().__init__(
             "Força do Espelho",
             None,
@@ -30,14 +28,14 @@ class MirrorForce(Card):
 
 
 class Cilindro(Card):
-    def __init__(self, name, ATK, type, effect, attackingMonster: Monster):
+    def __init__(self):
         super().__init__(
             "Cilindro Mágico",
             None,
             CardType.TRAP,
             "Quando um monstro do oponente declarar um ataque: escolha o monstro atacante; negue o ataque e cause dano ao seu oponente igual ao ATK dele.",
         )
-        self.attackingMonster = attackingMonster
+        self.attackingMonster = None
 
     @override
     def effect(self, player: Player, opponent: Player):
@@ -46,14 +44,14 @@ class Cilindro(Card):
 
 
 class BuracoArmadilha(Card):
-    def __init__(self, name, ATK, type, effect, attackingMonster: Monster):
+    def __init__(self):
         super().__init__(
             "Buraco Armadilha",
             None,
             CardType.TRAP,
             "Quando seu oponente atacar com um monstro: escolha o monstro; destrua o alvo.",
         )
-        self.attackingMonster = attackingMonster
+        self.attackingMonster = None
 
     @override
     def effect(self, player: Player, opponent: Player):
@@ -62,14 +60,14 @@ class BuracoArmadilha(Card):
 
 
 class Aparelho(Card):
-    def __init__(self, name, ATK, type, effect, attackingMonster: Monster):
+    def __init__(self):
         super().__init__(
             "Aparelho de Evacuação Obrigatória",
             None,
             CardType.TRAP,
             "Quando seu oponente atacar com um monstro: escolha o monstro; devolva o alvo para a mão.",
         )
-        self.attackingMonster = attackingMonster
+        self.attackingMonster = None
 
     @override
     def effect(self, player: Player, opponent: Player):
@@ -78,14 +76,14 @@ class Aparelho(Card):
 
 
 class NegateAttack(Card):
-    def __init__(self, name, ATK, type, effect, attackingMonster: Monster):
+    def __init__(self):
         super().__init__(
             "Negativação de Ataque",
             None,
             CardType.TRAP,
             "Quando um monstro do oponente declarar um ataque: escolha o monstro atacante; negue o ataque.",
         )
-        self.attackingMonster = attackingMonster
+        self.attackingMonster = None
 
     @override
     def effect(self, player: Player, opponent: Player):
