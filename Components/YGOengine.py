@@ -38,6 +38,15 @@ class YGOengine:
             return success
         return False
 
+    def receive_network_message(self, message):
+        "Função auxiliar para receber mensagens pela rede"
+        if self.network and self.network.is_connected:
+            success = self.network.receive_message(message)
+            if not success:
+                print("Falha ao receber mensagem pela rede")
+            return success
+        return False
+
     def advanceToNextPhase(self):
         """Avança o jogo para a próxima fase lógica."""
         if self.currentPhase == GamePhase.DRAW:
@@ -57,10 +66,6 @@ class YGOengine:
     def endTurn(self):
         """Executa a lógica de fim de turno."""
 
-        # notificando fim de turno antes de trocar os jogadores
-        message = MessageConstructor.passar_turno()
-        self.send_network_message(message)
-
         # Os monstros agora podem atacar no próximo turno do controlador
         for monster in self.turnPlayer.monstersInField:
             if not monster.canAttack:
@@ -73,6 +78,10 @@ class YGOengine:
         self.turnCount += 1  # Incrementando contagem do turno
         self.summonThisTurn = False  # Agora, o dono do turno pode invocar
         self.currentPhase = GamePhase.DRAW  # Começa comprando uma
+
+        # notificando fim de turno antes de trocar os jogadores
+        message = MessageConstructor.passar_turno()
+        self.send_network_message(message)
 
     # Usado para ações que mudam o estado do jogo
     def processPlayerAction(self, actionCommand: str, payload: dict = None) -> dict:

@@ -14,7 +14,7 @@ class Raigeki(Card):
         super().__init__(
             "Raigeki",
             None,
-            CardType.MAGIC,
+            CardType.SPELL,
             "Destrói todos os monstros no campo do oponente.",
         )
 
@@ -35,7 +35,7 @@ class DianKeto(Card):
         super().__init__(
             "Dian Keto, Mestre da Cura",
             None,
-            CardType.MAGIC,
+            CardType.SPELL,
             "Ganhe 1000 pontos de vida.",
         )
 
@@ -48,7 +48,7 @@ class DianKeto(Card):
 class PoteDaGanancia(Card):
     def __init__(self):
         super().__init__(
-            "Pote da Ganância", None, CardType.MAGIC, "Compre duas cartas."
+            "Pote da Ganância", None, CardType.SPELL, "Compre duas cartas."
         )
 
     @override
@@ -64,7 +64,7 @@ class TempestadePesada(Card):
         super().__init__(
             "Tempestade Pesada",
             None,
-            CardType.MAGIC,
+            CardType.SPELL,
             "Destrua todos os Cards de Magia e Armadilha no campo..",
         )
 

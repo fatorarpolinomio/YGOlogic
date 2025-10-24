@@ -11,7 +11,7 @@ if typing.TYPE_CHECKING:
 # Enum básico para representar os tipos de cartas
 class CardType(Enum):
     MONSTER = 1
-    MAGIC = 2
+    SPELL = 2
     TRAP = 3
 
 

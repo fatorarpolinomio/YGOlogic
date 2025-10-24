@@ -60,7 +60,7 @@ class YGOinterface:
         options = {}
         option_index = 1
 
-        if card.type == CardType.MONSTER and playerCanSummon:
+        if card.type == CardType.MONSTER:  # and playerCanSummon:
             print(f"{option_index}) Invocar Monstro")
             options[option_index] = {"action": "SUMMON", "card": card}
             option_index += 1
@@ -146,7 +146,7 @@ class YGOinterface:
         if next == 0:
             return
         else:
-            self.cardAction(player.hand[next], playerCanSummon)
+            self.cardAction(player.hand[next - 1], playerCanSummon)
 
     def selectAttacker(self, attackers: list[Monster]) -> Monster:
         count = 0
