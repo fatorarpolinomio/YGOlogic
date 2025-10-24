@@ -33,15 +33,13 @@ def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
 
     print(f"Seu oponente é: {opponent_name}")
 
-    opponent = Player(opponentName, 4000)
+    opponent = Player(opponent_name, 4000)
     opponent.shuffleDeck()
     opponent.initialHand()
 
     if not opponent_name:
         print("Erro ao trocar informações com o oponente.")
         return None, None
-
-    print(f"\n--- Jogo Iniciado: {player.name} vs {opponent.name} ---")
 
     return player, opponent
 
@@ -54,6 +52,10 @@ def run_game_loop(net, is_host, player, opponent):
     # Inicializando as duas classes principais:
     engine = YGOengine(player, opponent, net, is_host)
     interface = YGOinterface()
+
+    print(
+        f"\n--- Jogo Iniciado: {engine.turnPlayer.name} vs {engine.nonTurnPlayer.name} ---"
+    )
 
     # loop continua enquanto o jogo não acabar
     while not game_over:
@@ -111,7 +113,7 @@ def run_game_loop(net, is_host, player, opponent):
                     result = engine.processPlayerAction(
                         commandDict["action"], commandDict
                     )
-
+                    print("")
                     # O engine retorna se foi sucesso ou não
                     if not result["success"]:
                         # interface.displayError(result["reason"])
@@ -119,6 +121,7 @@ def run_game_loop(net, is_host, player, opponent):
                     else:
                         # interface.displaySuccess(f"{command_dict['action']} bem-sucedido!")
                         print(f"Ação bem-sucedida: {result['card_name']}")
+                        if result["card"]
 
             elif actionString == "DECLARE_ATTACK":
                 attackers = engine.getAttackableMonsters(engine.turnPlayer)
