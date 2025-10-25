@@ -98,8 +98,7 @@ class MessageConstructor:
             "card": {
                 "name": card_data["name"],
                 "ATK": card_data["ATK"],
-                "type": card_data["type"],
-                "effect": card_data.get("effect", ""),
+                "type": card_data["type"]
             },
         }
 

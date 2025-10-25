@@ -64,6 +64,73 @@ class YGOengine:
 
         print(f"Iniciando seu turno (Turno {self.turnCount}) - {self.turnPlayer.name}")
 
+    def handle_opponent_summon_monster(self, payload: dict):
+        """
+        Processa o RECEBIMENTO da mensagem 'INVOCAR_MONSTRO'.
+        Cria uma "representação" do monstro e a adiciona ao campo
+        do oponente (self.nonTurnPlayer).
+        """
+        try:
+            card_data = payload.get("card_data")
+            if not card_data:
+                print("Erro de rede: Mensagem INVOCAR_MONSTRO sem card_data.")
+                return
+
+            print(f"Oponente invocou: {card_data.get('name')}")
+
+            # Criamos um "dummy monster" (um objeto monstro local)
+            # com os dados recebidos para representar a carta do oponente.
+            # NOTA: Isso assume que seu construtor de Monstro aceita
+            # (name, level, attribute, type, ATK, DEF, description)
+            # Se for diferente, ajuste aqui.
+            dummy_monster = Monster(
+                name=card_data.get("name"),
+                level=4,  # Nível padrão (não enviado)
+                attribute="LIGHT",  # Atributo padrão (não enviado)
+                type=CardType[card_data.get("type", "MONSTER")],
+                ATK=card_data.get("ATK"),
+                DEF=1000,  # DEF padrão (não enviado)
+                description="Carta invocada pelo oponente.",
+            )
+
+            # Adiciona o monstro ao campo do oponente (que é o nonTurnPlayer local)
+            self.nonTurnPlayer.monstersInField.append(dummy_monster)
+            self.nonTurnPlayer.monstersCount += 1
+
+        except Exception as e:
+            print(f"Erro ao processar invocação do oponente: {e}")
+
+    def handle_opponent_set_card(self, payload: dict):
+        """
+        Processa o RECEBIMENTO da mensagem 'COLOCAR_CARTA_BAIXO'.
+        Cria uma "representação" da carta e a adiciona ao campo
+        do oponente (self.nonTurnPlayer).
+        """
+        try:
+            card_type_str = payload.get("card_type")
+            if not card_type_str:
+                print("Erro de rede: Mensagem COLOCAR_CARTA_BAIXO sem card_type.")
+                return
+
+            print("Oponente baixou uma carta.")
+
+            # Criamos uma "dummy card" genérica
+            # NOTA: Isso assume que seu construtor de Card aceita
+            # (name, type, description)
+            dummy_card = Card(
+                name="Carta Baixada",
+                type=CardType[card_type_str],
+                description="Carta baixada pelo oponente.",
+            )
+            dummy_card.setted = True  # Marca a carta como "setada"
+
+            # Adiciona a carta ao campo do oponente (que é o nonTurnPlayer local)
+            self.nonTurnPlayer.spellsAndTrapsInField.append(dummy_card)
+            self.nonTurnPlayer.spellsAndTrapsCount += 1
+
+        except Exception as e:
+            print(f"Erro ao processar carta baixada do oponente: {e}")
+            
     def send_network_message(self, message):
         "Função auxiliar para enviar mensagens pela rede"
         if self.network and self.network.is_connected:
@@ -194,8 +261,7 @@ class YGOengine:
             card_data={
                 "name": monster.name,
                 "ATK": monster.ATK,
-                "type": monster.type.name,
-                "effect": monster.effectDescription,
+                "type": monster.type.name
             },
         )
         self.send_network_message(message)

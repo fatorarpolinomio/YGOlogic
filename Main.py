@@ -202,7 +202,15 @@ def run_game_loop(net, is_host, player, opponent):
                 if nova_fase_str in GamePhase.__members__:
                      engine.currentPhase = GamePhase[nova_fase_str]
                      print(f"Oponente mudou para a fase: {nova_fase_str}")
-
+            
+            elif msg_type == MessageType.INVOCAR_MONSTRO:
+                # O oponente invocou um monstro, atualize nosso engine
+                engine.handle_opponent_summon_monster(message)
+            
+            elif msg_type == MessageType.COLOCAR_CARTA_BAIXO:
+                # O oponente baixou uma carta, atualize nosso engine
+                engine.handle_opponent_set_card(message)
+                
             if message:
                 if message.get("tipo") == "DECLARAR_ATAQUE":
                     print("Oponente declarou um ataque!")
