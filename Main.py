@@ -1,4 +1,4 @@
-from turtle import clear
+from turtle import clear00
 from Communication.network import Network
 from Communication.messages_protocol import MessageConstructor
 from Components.YGOinterface import YGOinterface
@@ -166,58 +166,60 @@ def run_game_loop(net, is_host, player, opponent):
                     attacker_idx = received_message.get("atacante_index")
                     target_idx = received_message.get("defensor_index")
 
-                attacker_monster = engine.nonTurnPlayer.monstersInField[attacker_idx]
-                target_monster = (
-                    engine.turnPlayer.monstersInField[target_idx]
-                    if target_idx is not None
-                    else None
-                )
-
-                # 1. Pergunta ao engine do defensor se há armadilhas
-                valid_traps = engine.checkForTrapResponse(attacker_monster)
-
-                trap_to_activate = None
-                if valid_traps:
-                    # 2. Se houver, pergunta ao jogador defensor (via interface)
-                    trap_to_activate = interface.promptTrapActivation(
-                        valid_traps, attacker_monster
+                    attacker_monster = engine.nonTurnPlayer.monstersInField[
+                        attacker_idx
+                    ]
+                    target_monster = (
+                        engine.turnPlayer.monstersInField[target_idx]
+                        if target_idx is not None
+                        else None
                     )
 
-                # 3. Envia a resposta de volta ao atacante
-                if trap_to_activate:
-                    # Ativa a armadilha localmente
-                    engine.activateTrap(
-                        engine.turnPlayer, engine.nonTurnPlayer, trap_to_activate
-                    )  #
+                    # 1. Pergunta ao engine do defensor se há armadilhas
+                    valid_traps = engine.checkForTrapResponse(attacker_monster)
 
-                    # Envia a resposta "SIM"
-                    message = MessageConstructor.resposta_armadilha(
-                        ativar=True, trap_name=trap_to_activate.name
-                    )
-                    net.send_message(message)
-                else:
-                    # Envia a resposta "NÃO"
-                    message = MessageConstructor.resposta_armadilha(ativar=False)
-                    net.send_message(message)
+                    trap_to_activate = None
+                    if valid_traps:
+                        # 2. Se houver, pergunta ao jogador defensor (via interface)
+                        trap_to_activate = interface.promptTrapActivation(
+                            valid_traps, attacker_monster
+                        )
 
-                continue
+                    # 3. Envia a resposta de volta ao atacante
+                    if trap_to_activate:
+                        # Ativa a armadilha localmente
+                        engine.activateTrap(
+                            engine.turnPlayer, engine.nonTurnPlayer, trap_to_activate
+                        )  #
 
-            # (Adicionar um handler para a mensagem "RESULTADO_BATALHA" aqui)
-            # ex: elif received_message.get("tipo") == "RESULTADO_BATALHA":
-            #         engine.processar_resultado_batalha_oponente(received_message)
+                        # Envia a resposta "SIM"
+                        message = MessageConstructor.resposta_armadilha(
+                            ativar=True, trap_name=trap_to_activate.name
+                        )
+                        net.send_message(message)
+                    else:
+                        # Envia a resposta "NÃO"
+                        message = MessageConstructor.resposta_armadilha(ativar=False)
+                        net.send_message(message)
 
-            # engine.processNetworkAction(received_message)
+                    continue
 
-            elif received_message.get("tipo") == "PASSAR_TURNO":
-                print("Oponente encerrou o turno.")
-                engine.endTurn()
-                my_turn = True
-                continue
+                # (Adicionar um handler para a mensagem "RESULTADO_BATALHA" aqui)
+                # ex: elif received_message.get("tipo") == "RESULTADO_BATALHA":
+                #         engine.processar_resultado_batalha_oponente(received_message)
 
-            # elif received_message.get("tipo") == MessageType.SAIR:
-            #    print("Oponente desconectado.")
-            #    game_over = True
-            #    continue
+                # engine.processNetworkAction(received_message)
+
+                elif received_message.get("tipo") == "PASSAR_TURNO":
+                    print("Oponente encerrou o turno.")
+                    engine.endTurn()
+                    my_turn = True
+                    continue
+
+                # elif received_message.get("tipo") == MessageType.SAIR:
+                #    print("Oponente desconectado.")
+                #    game_over = True
+                #    continue
 
         # condição de vitória/derrota por pontos de vida
         if engine.turnPlayer.life <= 0 or engine.nonTurnPlayer.life <= 0:
