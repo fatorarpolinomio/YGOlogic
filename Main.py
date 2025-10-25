@@ -5,6 +5,7 @@ from Components.YGOengine import YGOengine, GamePhase
 from Components.YGOplayer import Player
 import os
 import time
+import sys
 
 
 def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
@@ -57,7 +58,9 @@ def run_game_loop(net, is_host, player, opponent):
     # Inicializando as duas classes principais:
     engine = YGOengine(player, opponent, net, is_host)
     interface = YGOinterface()
-
+    # Flag para controlar a impressão do cabeçalho do turno do oponente
+    opponent_header_printed = False
+    loading_dots = 0
     print(
         f"\n--- Jogo Iniciado: {engine.turnPlayer.name} vs {engine.nonTurnPlayer.name} ---"
     )
@@ -65,6 +68,11 @@ def run_game_loop(net, is_host, player, opponent):
     # loop continua enquanto o jogo não acabar
     while not game_over:
         if my_turn:
+
+            if opponent_header_printed: 
+                opponent_header_printed = False
+                loading_dots = 0
+
             currentPlayer = engine.turnPlayer
 
             interface.displayPhase(
@@ -119,7 +127,8 @@ def run_game_loop(net, is_host, player, opponent):
 
                 if actionString == "END_TURN":
                     my_turn = False  # Passa o controle
-                    print("Turno encerrado. Aguardando oponente...")
+                    opponent_header_printed = False
+                    print("Turno encerrado.")
 
             elif actionString == "VIEW_FIELD":
                 interface.viewField(engine.turnPlayer, engine.nonTurnPlayer)
@@ -175,94 +184,92 @@ def run_game_loop(net, is_host, player, opponent):
                     )
             time.sleep(0.1)
         else:
-            print("\nAguardando jogada do oponente...")
+            #print("\nAguardando jogada do oponente...")
             # mostra a fase atual do oponente
-            if engine.currentPhase == GamePhase.DRAW:
-                interface.displayPhase(
-                    engine.currentPhase.name, engine.turnPlayer.name, engine.turnCount
-                )
-                print(f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}")
+            #if engine.currentPhase == GamePhase.DRAW:
+            #    interface.displayPhase(
+            #        engine.currentPhase.name, engine.turnPlayer.name, engine.turnCount
+            #    )
+            #    print(f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}")
 
-            print(f"Aguardando jogada do oponente ({engine.turnPlayer.name})...")
+            #print(f"Aguardando jogada do oponente ({engine.turnPlayer.name})...")
 
             message = net.get_message()
 
             if not message:
                 time.sleep(0.5)  # Espera se não houver mensagens
                 continue  # Volta ao início do loop (ainda turno do oponente)
+        
+            if message:
+                # LIMPA a linha de "loading" antes de imprimir a nova ação
+                # (Imprime 60 espaços em branco e volta ao início da linha)
+                print(" " * 60, end="\r")
+                sys.stdout.flush()
 
             # Processa a mensagem recebida
-            msg_type = message.get("tipo")
+                msg_type = message.get("tipo")
 
-            # === ESTA É A CORREÇÃO PRINCIPAL ===
-            if msg_type == MessageType.PASSAR_TURNO:
-                # Chama a *nova* função que SÓ atualiza o estado local
-                engine.handle_opponent_pass_turn()
-                my_turn = True  # Pega o controle de volta
+                if msg_type == MessageType.PASSAR_TURNO:
+                    # Chama a *nova* função que SÓ atualiza o estado local
+                    engine.handle_opponent_pass_turn()
+                    my_turn = True  # Pega o controle de volta
+                    opponent_header_printed = False # Prepara para o *próximo* turno dele
+                    
+                    print("\n" + "=" * 30)
+                    print("É O SEU TURNO!")
+                    print("=" * 30)
+            
 
-            elif msg_type == MessageType.MUDOU_FASE:
-                # Atualiza a fase local para refletir a do oponente
-                nova_fase_str = message.get("fase_atual")
-                if nova_fase_str in GamePhase.__members__:
-                    engine.currentPhase = GamePhase[nova_fase_str]
-                    print(f"Oponente mudou para a fase: {nova_fase_str}")
+                elif msg_type == MessageType.MUDOU_FASE:
+                    nova_fase_str = message.get("fase")
+                    if nova_fase_str in GamePhase.__members__:
+                        engine.currentPhase = GamePhase[nova_fase_str]
+                        print(f"\nOponente mudou para a fase: {nova_fase_str}")
+                        # Força a reimpressão do cabeçalho com a nova fase
+                        opponent_header_printed = False
 
-            elif msg_type == MessageType.INVOCAR_MONSTRO:
-                # O oponente invocou um monstro, atualize nosso engine
-                engine.handle_opponent_summon_monster(message)
+                elif msg_type == MessageType.INVOCAR_MONSTRO:
+                    # O oponente invocou um monstro, atualize nosso engine
+                    engine.handle_opponent_summon_monster(message)
 
-            elif msg_type == MessageType.COLOCAR_CARTA_BAIXO:
-                # O oponente baixou uma carta, atualize nosso engine
-                engine.handle_opponent_set_card(message)
+                elif msg_type == MessageType.COLOCAR_CARTA_BAIXO:
+                    # O oponente baixou uma carta, atualize nosso engine
+                    engine.handle_opponent_set_card(message)
 
-            elif message.get("tipo") == "DECLARAR_ATAQUE":
-                print("Oponente declarou um ataque!")
-                # Pega os monstros envolvidos (do ponto de vista do defensor)
-                attacker_idx = message.get("attacker_index")
-                target_idx = message.get("target_index")
-                attacker_monster = engine.turnPlayer.monstersInField[attacker_idx]
-                target_monster = (
-                    engine.nonTurnPlayer.monstersInField[target_idx]
-                    if target_idx is not None
-                    else None
-                )
-                # 1. Pergunta ao engine do defensor se há armadilhas
-                valid_traps = engine.checkForTrapResponse(attacker_monster)
-                trap_to_activate = None
-                if valid_traps:
-                    # 2. Se houver, pergunta ao jogador defensor (via interface)
-                    trap_to_activate = interface.promptTrapActivation(
-                        valid_traps, attacker_monster
+                elif msg_type == MessageType.ATIVAR_MAGIA:
+                    # O oponente ativou uma magia, atualize nosso engine
+                    engine.handle_opponent_activate_spell(message)
+
+                elif msg_type == MessageType.DECLARAR_ATAQUE:
+                    # A lógica foi movida para o engine para verificação correta
+                    # e para manter o Main.py mais limpo.
+                    engine.handle_opponent_declare_attack(message, interface)
+
+                elif msg_type == MessageType.RESULTADO_BATALHA:
+                    # O oponente atacou, e esta é a resolução
+                    engine.handle_opponent_battle_result(message)
+
+            else:
+                # Se o cabeçalho "Turno do Oponente" ainda não foi impresso
+                if not opponent_header_printed:
+                    print("\n" + "=" * 40)
+                    interface.displayPhase(
+                        engine.currentPhase.name, engine.turnPlayer.name, engine.turnCount
                     )
-                # 3. Envia a resposta de volta ao atacante
-                if trap_to_activate:
-                    # Ativa a armadilha localmente
-                    engine.activateTrap(
-                        engine.turnPlayer, engine.nonTurnPlayer, trap_to_activate
-                    )  #
-                    # Envia a resposta "SIM"
-                    message = MessageConstructor.ativar_armadilha(
-                        tem_armadilha=True,
-                        ativar_armadilha=True,
-                        trap_name=trap_to_activate.name,
-                    )
-                    net.send_message(message)
-                else:
-                    # Envia a resposta "NÃO"
-                    tem_traps = bool(
-                        valid_traps
-                    )  # Verifica se haviam traps disponíveis
-                    message = MessageConstructor.ativar_armadilha(
-                        tem_armadilha=tem_traps, ativar_armadilha=False
-                    )
-                    net.send_message(message)
-            continue
+                    print(f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}")
+                    print("=" * 40)
+                    opponent_header_printed = True # Marca como impresso
+                    loading_dots = 0 # Reinicia a animação
 
-            # (Adicionar um handler para a mensagem "RESULTADO_BATALHA" aqui)
-            # ex: elif received_message.get("tipo") == "RESULTADO_BATALHA":
-            #         engine.processar_resultado_batalha_oponente(received_message)
-
-            # engine.processNetworkAction(received_message)
+                # Animação de "loading"
+                dots_str = "." * (loading_dots + 1)
+                
+                # Imprime na mesma linha. O `\r` retorna ao início da linha.
+                # O `{dots_str:<3}` garante que o espaço seja preenchido (limpa pontos antigos)
+                print(f"Aguardando jogada do oponente {dots_str:<3}", end="\r")
+                sys.stdout.flush() # Força a impressão imediata
+                
+                loading_dots = (loading_dots + 1) % 3      
 
             # elif received_message.get("tipo") == MessageType.SAIR:
             #    print("Oponente desconectado.")
