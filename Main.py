@@ -21,14 +21,19 @@ def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
 
     if is_host:
         # espera o nome do oponente para poder criar o objeto dele
-        opponent_name_data = net.receive_message()
+        opponent_name_data = None
+        while opponent_name_data is None:
+            opponent_name_data = net.get_message()
+
         opponent_name = opponent_name_data["name"]
         net.send_message({"name": player.name})
 
     else:  # Se for o convidado
         # Convidado envia seu nome primeiro
         net.send_message({"name": playerName})
-        opponent_name_data = net.receive_message()
+        opponent_name_data = None
+        while opponent_name_data is None:
+            opponent_name_data = net.get_message()
         opponent_name = opponent_name_data["name"]
 
     print(f"Seu oponente é: {opponent_name}")
@@ -121,7 +126,6 @@ def run_game_loop(net, is_host, player, opponent):
                     else:
                         # interface.displaySuccess(f"{command_dict['action']} bem-sucedido!")
                         print(f"Ação bem-sucedida: {result['card_name']}")
-                        if result["card"]
 
             elif actionString == "DECLARE_ATTACK":
                 attackers = engine.getAttackableMonsters(engine.turnPlayer)
@@ -154,16 +158,13 @@ def run_game_loop(net, is_host, player, opponent):
             print("\nAguardando jogada do oponente...")
 
             received_message = net.get_message()
-            if not received_message:
-                print("Oponente desconectado.")
-                game_over = True
-                continue
 
-            if received_message.get("tipo") == "DECLARAR_ATAQUE":
-                print("Oponente declarou um ataque!")
-                # Pega os monstros envolvidos (do ponto de vista do defensor)
-                attacker_idx = received_message.get("atacante_index")
-                target_idx = received_message.get("defensor_index")
+            if received_message:
+                if received_message.get("tipo") == "DECLARAR_ATAQUE":
+                    print("Oponente declarou um ataque!")
+                    # Pega os monstros envolvidos (do ponto de vista do defensor)
+                    attacker_idx = received_message.get("atacante_index")
+                    target_idx = received_message.get("defensor_index")
 
                 attacker_monster = engine.nonTurnPlayer.monstersInField[attacker_idx]
                 target_monster = (
@@ -206,13 +207,17 @@ def run_game_loop(net, is_host, player, opponent):
             #         engine.processar_resultado_batalha_oponente(received_message)
 
             # engine.processNetworkAction(received_message)
-            engine.receive_network_message(received_message)
 
-            if received_message.get("tipo") == "PASSAR_TURNO":
+            elif received_message.get("tipo") == "PASSAR_TURNO":
                 print("Oponente encerrou o turno.")
                 engine.endTurn()
                 my_turn = True
                 continue
+
+            # elif received_message.get("tipo") == MessageType.SAIR:
+            #    print("Oponente desconectado.")
+            #    game_over = True
+            #    continue
 
         # condição de vitória/derrota por pontos de vida
         if engine.turnPlayer.life <= 0 or engine.nonTurnPlayer.life <= 0:

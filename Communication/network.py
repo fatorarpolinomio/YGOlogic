@@ -116,13 +116,9 @@ class Network:
             print("Erro: Não há conexão ativa")
             return False
         
-        # validação básica
-        if not isinstance(message, dict):
-            print("Erro: Mensagem deve ser um dicionário")
-            return False
-        
         if "tipo" not in message:
             print("Aviso: Mensagem sem campo 'tipo'")
+            
         try:
             # Converte o dicionário Python para uma string no formato JSON
             # Codifica a string JSON para o formato de bytes (utf-8) )que é o que a rede transporta)

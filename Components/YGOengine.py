@@ -336,7 +336,9 @@ class YGOengine:
         while response_message is None:
             response_message = self.network.get_message()
         # AQUI O JOGO DO ATACANTE "CONGELA" ATÉ RECEBER A RESPOSTA
-        response_message = self.network.receive_message()
+        response_message = None
+        while response_message is None:
+            response_message = self.network.get_message()
 
         if (
             response_message
