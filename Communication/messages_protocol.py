@@ -98,7 +98,7 @@ class MessageConstructor:
             "card": {
                 "name": card_data["name"],
                 "ATK": card_data["ATK"],
-                "type": card_data["type"]
+                "type": card_data["type"],
             },
         }
 
@@ -161,14 +161,14 @@ class MessageConstructor:
         }
 
     @staticmethod
-    def ativar_armadilha(tem_armadilha, ativar_armadilha=False, trap_index=None):
+    def ativar_armadilha(tem_armadilha, ativar_armadilha=False, trap_name: str = None):
         """
         Sintaxe: {"tipo": "ATIVAR_ARMADILHA", "fase": "BATTLE",
-                  "tem_armadilha": bool, "ativar": bool, "trap_index": int|null}
+                  "tem_armadilha": bool, "ativar": bool, "trap_name": str|null}
         Gramática: "tipo" = "ATIVAR_ARMADILHA" | "fase" -> "BATTLE" |tem_armadilha (bool) |
-                   ativar (bool) | trap_index (int) ou null
+                   ativar (bool) | trap_name (str) ou null
         Semântica: Oponente responde ao ataque declarado
-                   Se ativar=True, especifica qual armadilha (trap_index)
+                   Se ativar=True, especifica qual armadilha (trap_name)
                    Se ativar=False, ataque prossegue normalmente
         """
         return {
@@ -176,7 +176,7 @@ class MessageConstructor:
             "fase": GamePhase.BATTLE.name,
             "tem_armadilha": tem_armadilha,
             "ativar": ativar_armadilha,
-            "trap_index": trap_index,
+            "trap_name": trap_name,
         }
 
     @staticmethod

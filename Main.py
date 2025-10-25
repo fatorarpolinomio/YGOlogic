@@ -76,7 +76,9 @@ def run_game_loop(net, is_host, player, opponent):
 
             # Verificação de segurança: O engine.turnPlayer DEVE ser o jogador local
             if currentPlayer.name != player.name:
-                print(f"!!! Erro de Sincronização: engine.turnPlayer é {currentPlayer.name}, deveria ser {player.name}")
+                print(
+                    f"!!! Erro de Sincronização: engine.turnPlayer é {currentPlayer.name}, deveria ser {player.name}"
+                )
                 # Aqui você pode querer parar o jogo ou tentar resincronizar
                 game_over = True
                 break
@@ -89,7 +91,10 @@ def run_game_loop(net, is_host, player, opponent):
                 result = engine.processPlayerAction(actionString)
 
                 # Aqui, o cara tomou deckout, perdendo o jogo
-                if result.get("success") == False and result.get("reason") == "DECK_EMPTY":
+                if (
+                    result.get("success") == False
+                    and result.get("reason") == "DECK_EMPTY"
+                ):
                     print("Você não tem mais cartas! Você perdeu!")
                     game_over = True
                     break
@@ -111,12 +116,11 @@ def run_game_loop(net, is_host, player, opponent):
                 result = engine.processPlayerAction(actionString)
 
                 print(result.get("message", ""))
-                
+
                 if actionString == "END_TURN":
-                    my_turn = False # Passa o controle
+                    my_turn = False  # Passa o controle
                     print("Turno encerrado. Aguardando oponente...")
-                
-            
+
             elif actionString == "VIEW_FIELD":
                 interface.viewField(engine.turnPlayer, engine.nonTurnPlayer)
 
@@ -180,93 +184,90 @@ def run_game_loop(net, is_host, player, opponent):
                 print(f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}")
 
             print(f"Aguardando jogada do oponente ({engine.turnPlayer.name})...")
-            
+
             message = net.get_message()
 
             if not message:
-                time.sleep(0.5) # Espera se não houver mensagens
-                continue # Volta ao início do loop (ainda turno do oponente)
+                time.sleep(0.5)  # Espera se não houver mensagens
+                continue  # Volta ao início do loop (ainda turno do oponente)
 
             # Processa a mensagem recebida
             msg_type = message.get("tipo")
-            
+
             # === ESTA É A CORREÇÃO PRINCIPAL ===
             if msg_type == MessageType.PASSAR_TURNO:
                 # Chama a *nova* função que SÓ atualiza o estado local
-                engine.handle_opponent_pass_turn() 
-                my_turn = True # Pega o controle de volta
-            
+                engine.handle_opponent_pass_turn()
+                my_turn = True  # Pega o controle de volta
+
             elif msg_type == MessageType.MUDOU_FASE:
                 # Atualiza a fase local para refletir a do oponente
                 nova_fase_str = message.get("fase_atual")
                 if nova_fase_str in GamePhase.__members__:
-                     engine.currentPhase = GamePhase[nova_fase_str]
-                     print(f"Oponente mudou para a fase: {nova_fase_str}")
-            
+                    engine.currentPhase = GamePhase[nova_fase_str]
+                    print(f"Oponente mudou para a fase: {nova_fase_str}")
+
             elif msg_type == MessageType.INVOCAR_MONSTRO:
                 # O oponente invocou um monstro, atualize nosso engine
                 engine.handle_opponent_summon_monster(message)
-            
+
             elif msg_type == MessageType.COLOCAR_CARTA_BAIXO:
                 # O oponente baixou uma carta, atualize nosso engine
                 engine.handle_opponent_set_card(message)
-                
-            if message:
-                if message.get("tipo") == "DECLARAR_ATAQUE":
-                    print("Oponente declarou um ataque!")
-                    # Pega os monstros envolvidos (do ponto de vista do defensor)
-                    attacker_idx = message.get("atacante_index")
-                    target_idx = message.get("defensor_index")
 
-                    attacker_monster = engine.nonTurnPlayer.monstersInField[
-                        attacker_idx
-                    ]
-                    target_monster = (
-                        engine.turnPlayer.monstersInField[target_idx]
-                        if target_idx is not None
-                        else None
+            elif message.get("tipo") == "DECLARAR_ATAQUE":
+                print("Oponente declarou um ataque!")
+                # Pega os monstros envolvidos (do ponto de vista do defensor)
+                attacker_idx = message.get("attacker_index")
+                target_idx = message.get("target_index")
+                attacker_monster = engine.turnPlayer.monstersInField[attacker_idx]
+                target_monster = (
+                    engine.nonTurnPlayer.monstersInField[target_idx]
+                    if target_idx is not None
+                    else None
+                )
+                # 1. Pergunta ao engine do defensor se há armadilhas
+                valid_traps = engine.checkForTrapResponse(attacker_monster)
+                trap_to_activate = None
+                if valid_traps:
+                    # 2. Se houver, pergunta ao jogador defensor (via interface)
+                    trap_to_activate = interface.promptTrapActivation(
+                        valid_traps, attacker_monster
                     )
+                # 3. Envia a resposta de volta ao atacante
+                if trap_to_activate:
+                    # Ativa a armadilha localmente
+                    engine.activateTrap(
+                        engine.turnPlayer, engine.nonTurnPlayer, trap_to_activate
+                    )  #
+                    # Envia a resposta "SIM"
+                    message = MessageConstructor.ativar_armadilha(
+                        tem_armadilha=True,
+                        ativar_armadilha=True,
+                        trap_name=trap_to_activate.name,
+                    )
+                    net.send_message(message)
+                else:
+                    # Envia a resposta "NÃO"
+                    tem_traps = bool(
+                        valid_traps
+                    )  # Verifica se haviam traps disponíveis
+                    message = MessageConstructor.ativar_armadilha(
+                        tem_armadilha=tem_traps, ativar_armadilha=False
+                    )
+                    net.send_message(message)
+            continue
 
-                    # 1. Pergunta ao engine do defensor se há armadilhas
-                    valid_traps = engine.checkForTrapResponse(attacker_monster)
+            # (Adicionar um handler para a mensagem "RESULTADO_BATALHA" aqui)
+            # ex: elif received_message.get("tipo") == "RESULTADO_BATALHA":
+            #         engine.processar_resultado_batalha_oponente(received_message)
 
-                    trap_to_activate = None
-                    if valid_traps:
-                        # 2. Se houver, pergunta ao jogador defensor (via interface)
-                        trap_to_activate = interface.promptTrapActivation(
-                            valid_traps, attacker_monster
-                        )
+            # engine.processNetworkAction(received_message)
 
-                    # 3. Envia a resposta de volta ao atacante
-                    if trap_to_activate:
-                        # Ativa a armadilha localmente
-                        engine.activateTrap(
-                            engine.turnPlayer, engine.nonTurnPlayer, trap_to_activate
-                        )  #
-
-                        # Envia a resposta "SIM"
-                        message = MessageConstructor.resposta_armadilha(
-                            ativar=True, trap_name=trap_to_activate.name
-                        )
-                        net.send_message(message)
-                    else:
-                        # Envia a resposta "NÃO"
-                        message = MessageConstructor.resposta_armadilha(ativar=False)
-                        net.send_message(message)
-
-                    continue
-
-                # (Adicionar um handler para a mensagem "RESULTADO_BATALHA" aqui)
-                # ex: elif received_message.get("tipo") == "RESULTADO_BATALHA":
-                #         engine.processar_resultado_batalha_oponente(received_message)
-
-                # engine.processNetworkAction(received_message)
-
-
-                # elif received_message.get("tipo") == MessageType.SAIR:
-                #    print("Oponente desconectado.")
-                #    game_over = True
-                #    continue
+            # elif received_message.get("tipo") == MessageType.SAIR:
+            #    print("Oponente desconectado.")
+            #    game_over = True
+            #    continue
 
         # condição de vitória/derrota por pontos de vida
         if engine.turnPlayer.life <= 0 or engine.nonTurnPlayer.life <= 0:

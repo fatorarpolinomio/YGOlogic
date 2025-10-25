@@ -1,3 +1,4 @@
+from typing import Set
 from Components.YGOplayer import Player
 from Components.cards.Monsters import Monster
 from Components.cards.YGOcards import Card, CardType
@@ -5,6 +6,7 @@ from Components.YGOgamePhase import GamePhase
 import Components.cards.Traps
 from Communication.network import Network
 from Communication.messages_protocol import MessageConstructor, MessageType
+import time
 
 
 # Classe geral, com a lógica das ações sem inputs ou prints
@@ -37,8 +39,7 @@ class YGOengine:
         # para rede
         self.network = network
         self.is_host = is_host
-    
-    
+
     def handle_opponent_pass_turn(self):
         """
         Processa o RECEBIMENTO da mensagem 'PASSAR_TURNO'.
@@ -46,7 +47,7 @@ class YGOengine:
         SEM enviar uma nova mensagem de rede.
         """
         print(f"Recebido: Oponente ({self.turnPlayer.name}) passou o turno.")
-        
+
         # Reseta status de ataque dos monstros do jogador anterior
         for monster in self.turnPlayer.monstersInField:
             if not monster.canAttack:
@@ -56,8 +57,8 @@ class YGOengine:
         self.turnPlayer, self.nonTurnPlayer = (
             self.nonTurnPlayer,
             self.turnPlayer,
-        )  
-        
+        )
+
         self.turnCount += 1
         self.summonThisTurn = False  # Reseta a flag de invocação
         self.currentPhase = GamePhase.DRAW  # Próximo turno começa na Draw Phase
@@ -71,7 +72,7 @@ class YGOengine:
         do oponente (self.nonTurnPlayer).
         """
         try:
-            card_data = payload.get("card_data")
+            card_data = payload.get("card")
             if not card_data:
                 print("Erro de rede: Mensagem INVOCAR_MONSTRO sem card_data.")
                 return
@@ -83,19 +84,23 @@ class YGOengine:
             # NOTA: Isso assume que seu construtor de Monstro aceita
             # (name, level, attribute, type, ATK, DEF, description)
             # Se for diferente, ajuste aqui.
-            dummy_monster = Monster(
+            card_type_str = card_data.get("type")
+            card_type_enum = CardType[card_type_str]
+            new_monster = Monster(
                 name=card_data.get("name"),
-                level=4,  # Nível padrão (não enviado)
-                attribute="LIGHT",  # Atributo padrão (não enviado)
-                type=CardType[card_data.get("type", "MONSTER")],
                 ATK=card_data.get("ATK"),
-                DEF=1000,  # DEF padrão (não enviado)
-                description="Carta invocada pelo oponente.",
+                type=card_type_enum,
+                effect=card_data.get("effect", ""),
             )
 
-            # Adiciona o monstro ao campo do oponente (que é o nonTurnPlayer local)
-            self.nonTurnPlayer.monstersInField.append(dummy_monster)
-            self.nonTurnPlayer.monstersCount += 1
+            if self.turnPlayer.monstersCount < 3:
+                self.turnPlayer.monstersInField.append(new_monster)
+                self.turnPlayer.monstersCount += 1
+                print(f"Oponente invocou: {new_monster.name}")
+            else:
+                print(
+                    "Erro de sincronia: Oponente invocou, mas o campo já estava cheio."
+                )
 
         except Exception as e:
             print(f"Erro ao processar invocação do oponente: {e}")
@@ -117,20 +122,25 @@ class YGOengine:
             # Criamos uma "dummy card" genérica
             # NOTA: Isso assume que seu construtor de Card aceita
             # (name, type, description)
-            dummy_card = Card(
-                name="Carta Baixada",
-                type=CardType[card_type_str],
-                description="Carta baixada pelo oponente.",
-            )
-            dummy_card.setted = True  # Marca a carta como "setada"
 
-            # Adiciona a carta ao campo do oponente (que é o nonTurnPlayer local)
-            self.nonTurnPlayer.spellsAndTrapsInField.append(dummy_card)
-            self.nonTurnPlayer.spellsAndTrapsCount += 1
+            set_card = Card(
+                name="Carta Baixada",
+                ATK=None,
+                type=CardType[card_type_str],
+                effectDescription="Carta baixada pelo oponente.",
+            )
+            if self.turnPlayer.spellsAndTrapsCount < 3:
+                self.turnPlayer.spellsAndTrapsInField.append(set_card)
+                self.turnPlayer.spellsAndTrapsCount += 1
+                print(f"Oponente baixou uma carta.")
+            else:
+                print(
+                    "Erro de sincronia: Oponente baixou carta, mas o campo já estava cheio."
+                )
 
         except Exception as e:
             print(f"Erro ao processar carta baixada do oponente: {e}")
-            
+
     def send_network_message(self, message):
         "Função auxiliar para enviar mensagens pela rede"
         if self.network and self.network.is_connected:
@@ -261,7 +271,7 @@ class YGOengine:
             card_data={
                 "name": monster.name,
                 "ATK": monster.ATK,
-                "type": monster.type.name
+                "type": monster.type.name,
             },
         )
         self.send_network_message(message)
@@ -427,7 +437,10 @@ class YGOengine:
             else None
         )
         message = MessageConstructor.declarar_ataque(
-            atacante_index=attacker_idx, defensor_index=target_idx
+            attacker_index=attacker_idx,
+            attacker_name=attackerMonster.name,
+            attacker_atk=attackerMonster.ATK,
+            target_index=target_idx,
         )
         self.send_network_message(message)
 
@@ -435,10 +448,7 @@ class YGOengine:
         response_message = None
         while response_message is None:
             response_message = self.network.get_message()
-        # AQUI O JOGO DO ATACANTE "CONGELA" ATÉ RECEBER A RESPOSTA
-        response_message = None
-        while response_message is None:
-            response_message = self.network.get_message()
+            time.sleep(0.1)
 
         if (
             response_message
@@ -450,7 +460,8 @@ class YGOengine:
             if trap_name == "Cilindro Mágico":
                 attackingPlayer.life -= attackerMonster.ATK
             elif trap_name == "Força do Espelho":
-                Components.cards.Traps.MirrorForce(defendingPlayer, attackingPlayer)
+                for monster in list(attackingPlayer.monstersInField):
+                    attackingPlayer.monsterIntoGraveyard(monster)
             elif trap_name == "Buraco Armadilha":
                 attackingPlayer.monsterIntoGraveyard(attackerMonster)
             elif trap_name == "Aparelho de Evacuação Obrigatória":
