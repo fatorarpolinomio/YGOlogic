@@ -95,7 +95,6 @@ class Network:
                 break
         print("[Network Thread] Thread de recebimento finalizada.")
 
-    # --- NOVO MÉTODO ---
     def get_message(self) -> Optional[Dict[str, Any]]:
         """
         Obtém uma mensagem da fila de forma NÃO-BLOQUEANTE.
@@ -118,7 +117,7 @@ class Network:
         
         if "tipo" not in message:
             print("Aviso: Mensagem sem campo 'tipo'")
-            
+
         try:
             # Converte o dicionário Python para uma string no formato JSON
             # Codifica a string JSON para o formato de bytes (utf-8) )que é o que a rede transporta)

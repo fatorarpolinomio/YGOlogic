@@ -1,9 +1,10 @@
 from Communication.network import Network
-from Communication.messages_protocol import MessageConstructor
+from Communication.messages_protocol import MessageConstructor, MessageType
 from Components.YGOinterface import YGOinterface
 from Components.YGOengine import YGOengine, GamePhase
 from Components.YGOplayer import Player
 import os
+import time
 
 
 def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
@@ -73,6 +74,13 @@ def run_game_loop(net, is_host, player, opponent):
                 f"Sua Vida: {engine.turnPlayer.life} | Vida do Oponente: {engine.nonTurnPlayer.life}"
             )
 
+            # Verificação de segurança: O engine.turnPlayer DEVE ser o jogador local
+            if currentPlayer.name != player.name:
+                print(f"!!! Erro de Sincronização: engine.turnPlayer é {currentPlayer.name}, deveria ser {player.name}")
+                # Aqui você pode querer parar o jogo ou tentar resincronizar
+                game_over = True
+                break
+
             actionString = None
 
             if engine.currentPhase == GamePhase.DRAW:
@@ -81,14 +89,15 @@ def run_game_loop(net, is_host, player, opponent):
                 result = engine.processPlayerAction(actionString)
 
                 # Aqui, o cara tomou deckout, perdendo o jogo
-                if result == {"success": False, "reason": "DECK_EMPTY"}:
+                if result.get("success") == False and result.get("reason") == "DECK_EMPTY":
+                    print("Você não tem mais cartas! Você perdeu!")
                     game_over = True
                     break
 
                 engine.advanceToNextPhase()
                 continue
 
-            if engine.currentPhase == GamePhase.MAIN_1:
+            elif engine.currentPhase == GamePhase.MAIN_1:
                 actionString = interface.promptMainPhaseActions(currentPlayer.name)
 
             elif engine.currentPhase == GamePhase.BATTLE:
@@ -101,6 +110,13 @@ def run_game_loop(net, is_host, player, opponent):
             if actionString in ["GO_TO_BATTLE_PHASE", "END_TURN"]:
                 result = engine.processPlayerAction(actionString)
 
+                print(result.get("message", ""))
+                
+                if actionString == "END_TURN":
+                    my_turn = False # Passa o controle
+                    print("Turno encerrado. Aguardando oponente...")
+                
+            
             elif actionString == "VIEW_FIELD":
                 interface.viewField(engine.turnPlayer, engine.nonTurnPlayer)
 
@@ -153,17 +169,46 @@ def run_game_loop(net, is_host, player, opponent):
                     battleResult = engine.resolveAttack(
                         engine.turnPlayer, engine.nonTurnPlayer, attacker, target
                     )
+            time.sleep(0.1)
         else:
             print("\nAguardando jogada do oponente...")
+            # mostra a fase atual do oponente
+            if engine.currentPhase == GamePhase.DRAW:
+                interface.displayPhase(
+                    engine.currentPhase.name, engine.turnPlayer.name, engine.turnCount
+                )
+                print(f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}")
 
-            received_message = net.get_message()
+            print(f"Aguardando jogada do oponente ({engine.turnPlayer.name})...")
+            
+            message = net.get_message()
 
-            if received_message:
-                if received_message.get("tipo") == "DECLARAR_ATAQUE":
+            if not message:
+                time.sleep(0.5) # Espera se não houver mensagens
+                continue # Volta ao início do loop (ainda turno do oponente)
+
+            # Processa a mensagem recebida
+            msg_type = message.get("tipo")
+            
+            # === ESTA É A CORREÇÃO PRINCIPAL ===
+            if msg_type == MessageType.PASSAR_TURNO:
+                # Chama a *nova* função que SÓ atualiza o estado local
+                engine.handle_opponent_pass_turn() 
+                my_turn = True # Pega o controle de volta
+            
+            elif msg_type == MessageType.MUDOU_FASE:
+                # Atualiza a fase local para refletir a do oponente
+                nova_fase_str = message.get("fase_atual")
+                if nova_fase_str in GamePhase.__members__:
+                     engine.currentPhase = GamePhase[nova_fase_str]
+                     print(f"Oponente mudou para a fase: {nova_fase_str}")
+
+            if message:
+                if message.get("tipo") == "DECLARAR_ATAQUE":
                     print("Oponente declarou um ataque!")
                     # Pega os monstros envolvidos (do ponto de vista do defensor)
-                    attacker_idx = received_message.get("atacante_index")
-                    target_idx = received_message.get("defensor_index")
+                    attacker_idx = message.get("atacante_index")
+                    target_idx = message.get("defensor_index")
 
                     attacker_monster = engine.nonTurnPlayer.monstersInField[
                         attacker_idx
@@ -209,11 +254,6 @@ def run_game_loop(net, is_host, player, opponent):
 
                 # engine.processNetworkAction(received_message)
 
-                elif received_message.get("tipo") == "PASSAR_TURNO":
-                    print("Oponente encerrou o turno.")
-                    engine.endTurn()
-                    my_turn = True
-                    continue
 
                 # elif received_message.get("tipo") == MessageType.SAIR:
                 #    print("Oponente desconectado.")

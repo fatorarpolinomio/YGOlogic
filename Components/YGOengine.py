@@ -20,6 +20,14 @@ class YGOengine:
         self.player2 = player2
         self.turnPlayer = player1
         self.nonTurnPlayer = player2
+
+        if is_host:
+            self.turnPlayer = player1
+            self.nonTurnPlayer = player2
+        else:
+            self.turnPlayer = player2  # O host (oponente) começa
+            self.nonTurnPlayer = player1
+
         self.currentPhase = GamePhase.DRAW
         self.turnCount = 1
 
@@ -29,6 +37,32 @@ class YGOengine:
         # para rede
         self.network = network
         self.is_host = is_host
+    
+    
+    def handle_opponent_pass_turn(self):
+        """
+        Processa o RECEBIMENTO da mensagem 'PASSAR_TURNO'.
+        Apenas atualiza o estado interno (troca jogadores, incrementa turno),
+        SEM enviar uma nova mensagem de rede.
+        """
+        print(f"Recebido: Oponente ({self.turnPlayer.name}) passou o turno.")
+        
+        # Reseta status de ataque dos monstros do jogador anterior
+        for monster in self.turnPlayer.monstersInField:
+            if not monster.canAttack:
+                monster.canAttack = True
+
+        # Inverte os jogadores
+        self.turnPlayer, self.nonTurnPlayer = (
+            self.nonTurnPlayer,
+            self.turnPlayer,
+        )  
+        
+        self.turnCount += 1
+        self.summonThisTurn = False  # Reseta a flag de invocação
+        self.currentPhase = GamePhase.DRAW  # Próximo turno começa na Draw Phase
+
+        print(f"Iniciando seu turno (Turno {self.turnCount}) - {self.turnPlayer.name}")
 
     def send_network_message(self, message):
         "Função auxiliar para enviar mensagens pela rede"
