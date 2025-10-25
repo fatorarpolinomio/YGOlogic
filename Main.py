@@ -1,4 +1,3 @@
-from turtle import clear00
 from Communication.network import Network
 from Communication.messages_protocol import MessageConstructor
 from Components.YGOinterface import YGOinterface
