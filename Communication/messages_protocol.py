@@ -199,10 +199,10 @@ class MessageConstructor:
 
     @staticmethod
     def resultado_batalha(
-        dano_ao_atacante,
-        dano_ao_defensor,
-        monstro_atacante_destruido,
-        monstro_defensor_destruido,
+        dano_atacante,
+        dano_defensor,
+        atacante_destruido,
+        defensor_destruido,
         atacante_index,
         defensor_index,
     ):
@@ -220,10 +220,10 @@ class MessageConstructor:
         """
         return {
             "tipo": MessageType.RESULTADO_BATALHA,
-            "dano_atacante": dano_ao_atacante,
-            "dano_defensor": dano_ao_defensor,
-            "atacante_destruido": monstro_atacante_destruido,
-            "defensor_destruido": monstro_defensor_destruido,
+            "dano_atacante": dano_atacante,
+            "dano_defensor": dano_defensor,
+            "atacante_destruido": atacante_destruido,
+            "defensor_destruido": defensor_destruido,
             "atacante_idx": atacante_index,
             "defensor_idx": defensor_index,
         }

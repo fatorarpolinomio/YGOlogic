@@ -169,20 +169,73 @@ def run_game_loop(net, is_host, player, opponent):
                 targetMonsters = engine.getAttackTargets(engine.nonTurnPlayer)
 
                 target = None
+                battleResult = None
+
                 if not targetMonsters:
-                    engine.resolveAttack(
+                    # Lógica de Ataque Direto
+                    print(f"{attacker.name} ataca diretamente!")
+                    battleResult = engine.resolveAttack(
                         engine.turnPlayer, engine.nonTurnPlayer, attacker, None
                     )
-                    continue
+        
                 else:
+                    # Lógica de Ataque a Monstro
                     target = interface.targetMonsterForAttack(targetMonsters)
                     if target is None:
                         print("Seleção de alvo cancelada.")
                         continue
+                    
+                    print(f"{attacker.name} ataca {target.name}!")
                     battleResult = engine.resolveAttack(
                         engine.turnPlayer, engine.nonTurnPlayer, attacker, target
                     )
-            time.sleep(0.1)
+                
+                # --- INÍCIO DA CORREÇÃO ---
+                # Agora, processamos o 'battleResult' em AMBOS os casos
+                
+                if battleResult: # Verifica se a batalha realmente aconteceu
+                    
+                    if battleResult.get("attack_negated"):
+                        # Caso 1: Armadilha foi ativada
+                        trap_name = battleResult.get('trap_name', 'uma armadilha')
+                        print(f"\n**********************************************")
+                        print(f"O oponente ativou a armadilha: {trap_name}!")
+                        print(f"O ataque de {attacker.name} foi negado/resolvido pela armadilha.")
+                        print(f"**********************************************")
+                    
+                    else:
+                        # Caso 2: Batalha normal (sem armadilha)
+                        print("\n--- Resultado da Batalha (Seu Ataque) ---")
+                        
+                        player_damage = battleResult.get("dano_atacante", 0)
+                        opponent_damage = battleResult.get("dano_defensor", 0)
+                        attacker_destroyed = battleResult.get("atacante_destruido", False)
+                        target_destroyed = battleResult.get("defensor_destruido", False)
+
+                        if opponent_damage > 0:
+                            print(f"Você causou {opponent_damage} de dano ao oponente.")
+                            engine.nonTurnPlayer.life -= opponent_damage
+                        if player_damage > 0:
+                            print(f"Você sofreu {player_damage} de dano de batalha.")
+                            engine.turnPlayer.life -= player_damage
+                        
+                        if attacker_destroyed:
+                            print(f"Seu monstro ({attacker.name}) foi destruído.")
+                            engine.turnPlayer.monsterIntoGraveyard(attacker)
+                        if target_destroyed and target: # 'target' pode ser None (ataque direto)
+                            print(f"O monstro do oponente ({target.name}) foi destruído.")
+                            engine.nonTurnPlayer.monsterIntoGraveyard(target)
+                        # atualiza o 'canAttack' do atacante se ele sobreviveu
+                        if not attacker_destroyed and attacker:
+                            attacker.canAttack = False
+                        if not attacker_destroyed and not target_destroyed and player_damage == 0 and opponent_damage == 0:
+                            if target: # Se foi batalha de monstros
+                                print("Nenhum monstro foi destruído (empate de ATK).")
+                            elif not target: # Se foi ataque direto (mas dano 0?)
+                                print("Ataque direto, mas nenhum dano foi causado.")
+                        
+                # Pausa para o jogador ler o resultado antes de voltar ao menu
+                input("\nPressione Enter para continuar...")
         else:
             #print("\nAguardando jogada do oponente...")
             # mostra a fase atual do oponente

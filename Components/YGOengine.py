@@ -66,7 +66,13 @@ class YGOengine:
         if self.currentPhase == GamePhase.DRAW:
             self.currentPhase = GamePhase.MAIN_1
         elif self.currentPhase == GamePhase.MAIN_1:
-            self.currentPhase = GamePhase.BATTLE
+            # Se for o primeiro turno do jogo, pule a Fase de Batalha
+            if self.turnCount == 1:
+                print("Regra: Não é permitido atacar no primeiro turno. Pulando para a Fase Final.")
+                self.currentPhase = GamePhase.END
+            else:
+                # Se não for o turno 1, prossiga normalmente
+                self.currentPhase = GamePhase.BATTLE
         elif self.currentPhase == GamePhase.BATTLE:
             self.currentPhase = GamePhase.END
 
@@ -156,7 +162,7 @@ class YGOengine:
 
         # Se já realizou uma invocação neste turno
         if self.summonThisTurn:
-            return {"success": False, "reason": "JA_INVOCOU_NESTE_TURNO"}
+            return {"success": False, "reason": "VOCE_JA_INVOCOU_NESTE_TURNO"}
 
         # Remove da mão e adiciona ao campo
         if monster in player.hand:
@@ -252,7 +258,7 @@ class YGOengine:
 
         # enviando mensagem
         message = MessageConstructor.ativar_armadilha(
-            tem_armadilha=True, ativar=True, trap_name=trap.name
+            tem_armadilha=True, ativar_armadilha=True, trap_name=trap.name
         )
         self.send_network_message(message)
 
@@ -400,10 +406,10 @@ class YGOengine:
 
                 # envia resultado da batalha
                 message = MessageConstructor.resultado_batalha(
-                    dano_ao_atacante=results["playerDamage"],
-                    dano_ao_defensor=results["opponentDamage"],
-                    monstro_atacante_destruido=results["attackerDestroyed"],
-                    monstro_defensor_destruido=results["targetDestroyed"],
+                    dano_atacante=results["playerDamage"],
+                    dano_defensor=results["opponentDamage"],
+                    atacante_destruido=results["attackerDestroyed"],
+                    defensor_destruido=results["targetDestroyed"],
                     atacante_index=attacker_idx,
                     defensor_index=target_idx,
                 )
@@ -451,8 +457,7 @@ class YGOengine:
                 print("Erro de rede: Mensagem INVOCAR_MONSTRO sem card_data.")
                 return
 
-            print(f"Oponente invocou: {card_data.get('name')}")
-
+        
             # Criamos um "dummy monster" (um objeto monstro local)
             # com os dados recebidos para representar a carta do oponente.
             # NOTA: Isso assume que seu construtor de Monstro aceita
@@ -463,8 +468,7 @@ class YGOengine:
             new_monster = Monster(
                 name=card_data.get("name"),
                 ATK=card_data.get("ATK"),
-                type=card_type_enum,
-                effect=card_data.get("effect", ""),
+                type=card_type_enum
             )
 
             if self.turnPlayer.monstersCount < 3:
@@ -624,7 +628,7 @@ class YGOengine:
 
         except Exception as e:
             print(f"Erro ao processar declaração de ataque do oponente: {e}")
-            
+
     def handle_opponent_battle_result(self, payload: dict):
         """
         Processa o RECEBIMENTO da mensagem 'RESULTADO_BATALHA'.
@@ -634,14 +638,14 @@ class YGOengine:
             # 'self.turnPlayer' é o Oponente (Atacante)
             # 'self.nonTurnPlayer' é o Jogador Local (Defensor)
             
-            dano_ao_oponente = payload.get("dano_atacante", 0)
-            dano_ao_local = payload.get("dano_defensor", 0)
-            oponente_destruido = payload.get("atacante_destruido", False)
-            local_destruido = payload.get("defensor_destruido", False)
+            dano_ao_oponente = payload.get("dano_ao_atacante", 0)
+            dano_ao_local = payload.get("dano_ao_defensor", 0)
+            oponente_destruido = payload.get("monstro_atacante_destruido", False)
+            local_destruido = payload.get("monstro_defensor_destruido", False)
             oponente_idx = payload.get("atacante_idx")
             local_idx = payload.get("defensor_idx")
 
-            # Pega a referência dos monstros ANTES de qualquer remoção
+            # Pega idx dos monstros ANTES de qualquer remoção
             monster_atacante = None
             if oponente_idx is not None and len(self.turnPlayer.monstersInField) > oponente_idx:
                 monster_atacante = self.turnPlayer.monstersInField[oponente_idx]

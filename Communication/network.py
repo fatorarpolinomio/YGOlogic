@@ -233,7 +233,7 @@ class Network:
         # aguarda a thread de recebimento finalizar
         if self.receiver_thread and self.receiver_thread.is_alive():
             print("Aguardando thread de recebimento finalizar...")
-            self.receiver_thread.join(timeout=10.0) # espera no máximo 10s
+            self.receiver_thread.join(timeout=5.0) # espera no máximo 5s
             if self.receiver_thread.is_alive():
                 print("Aviso: Thread de recebimento não finalizou a tempo.")
             else:
