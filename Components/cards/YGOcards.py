@@ -30,7 +30,7 @@ class Card(ABC):
             "name": self.name,
             "ATK": self.ATK,
             "type": self.type.name,  # .name para pegar o nome do Enum como texto
-            "effect": self.effect,
+            "effect": self.effectDescription
         }
 
     def __repr__(self):
