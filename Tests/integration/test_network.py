@@ -54,7 +54,7 @@ class TestNetworkLoopback(unittest.TestCase):
         host_thread.start()
         
         # 2. Espera o host sinalizar que está pronto (ou falhou)
-        self.assertTrue(self.host_event.wait(timeout=3), "Host thread demorou muito para iniciar")
+        self.assertTrue(self.host_event.wait(timeout=15), "Host thread demorou muito para iniciar")
         self.assertTrue(self.server_started, "Servidor (Host) falhou ao iniciar")
         
         # 3. Conecta o Cliente

@@ -66,13 +66,7 @@ class YGOengine:
         if self.currentPhase == GamePhase.DRAW:
             self.currentPhase = GamePhase.MAIN_1
         elif self.currentPhase == GamePhase.MAIN_1:
-            # Se for o primeiro turno do jogo, pule a Fase de Batalha
-            if self.turnCount == 1:
-                print("Regra: Não é permitido atacar no primeiro turno. Pulando para a Fase Final.")
-                self.currentPhase = GamePhase.END
-            else:
-                # Se não for o turno 1, prossiga normalmente
-                self.currentPhase = GamePhase.BATTLE
+            self.currentPhase = GamePhase.BATTLE
         elif self.currentPhase == GamePhase.BATTLE:
             self.currentPhase = GamePhase.END
 

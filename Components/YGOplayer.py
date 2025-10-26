@@ -48,9 +48,10 @@ class Player:
 
     # Comprar cartas
     def drawCard(self):
-        card = self.deck.pop()  # Retira carta do topo do deck
+        card = self.deck.pop(0) # Retira carta do topo do deck
         self.hand.append(card)  # Coloca na mão
-
+        return card
+    
     # Comprando três cartas para a mão inicial
     def initialHand(self):
         for i in range(3):
