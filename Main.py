@@ -67,8 +67,7 @@ def run_game_loop(net, is_host, player, opponent):
     # loop continua enquanto o jogo não acabar
     while not game_over:
         if my_turn:
-
-            if opponent_header_printed: 
+            if opponent_header_printed:
                 opponent_header_printed = False
                 loading_dots = 0
 
@@ -135,6 +134,13 @@ def run_game_loop(net, is_host, player, opponent):
             elif actionString == "VIEW_GRAVEYARD":
                 interface.viewGraveyard(engine.turnPlayer)
 
+            elif actionString == "DISCONNECT":
+                print("Desconectando...")
+                net.send_message(
+                    {"tipo": MessageType.SAIR, "mensagem": "Desconectando..."}
+                )
+                break
+
             elif actionString == "VIEW_HAND":
                 commandDict = interface.viewHand(
                     engine.turnPlayer, engine.summonThisTurn
@@ -176,101 +182,118 @@ def run_game_loop(net, is_host, player, opponent):
                     battleResult = engine.resolveAttack(
                         engine.turnPlayer, engine.nonTurnPlayer, attacker, None
                     )
-        
+
                 else:
                     # Lógica de Ataque a Monstro
                     target = interface.targetMonsterForAttack(targetMonsters)
                     if target is None:
                         print("Seleção de alvo cancelada.")
                         continue
-                    
+
                     print(f"{attacker.name} ataca {target.name}!")
                     battleResult = engine.resolveAttack(
                         engine.turnPlayer, engine.nonTurnPlayer, attacker, target
                     )
-                
+
                 # --- INÍCIO DA CORREÇÃO ---
                 # Agora, processamos o 'battleResult' em AMBOS os casos
-                
-                if battleResult: # Verifica se a batalha realmente aconteceu
-                    
+
+                if battleResult:  # Verifica se a batalha realmente aconteceu
                     if battleResult.get("attack_negated"):
                         # Caso 1: Armadilha foi ativada
-                        trap_name = battleResult.get('trap_name', 'uma armadilha')
+                        trap_name = battleResult.get("trap_name", "uma armadilha")
                         print(f"\n**********************************************")
                         print(f"O oponente ativou a armadilha: {trap_name}!")
-                        print(f"O ataque de {attacker.name} foi negado/resolvido pela armadilha.")
+                        print(f"O ataque de {attacker.name} foi negado pela armadilha.")
                         print(f"**********************************************")
-                    
+
                     else:
                         # Caso 2: Batalha normal (sem armadilha)
                         print("\n--- Resultado da Batalha (Seu Ataque) ---")
-                        
+
                         player_damage = battleResult.get("dano_atacante", 0)
                         opponent_damage = battleResult.get("dano_defensor", 0)
-                        attacker_destroyed = battleResult.get("atacante_destruido", False)
+                        attacker_destroyed = battleResult.get(
+                            "atacante_destruido", False
+                        )
                         target_destroyed = battleResult.get("defensor_destruido", False)
 
+                        # Imprimir dano
                         if opponent_damage > 0:
                             print(f"Você causou {opponent_damage} de dano ao oponente.")
-                            engine.nonTurnPlayer.life -= opponent_damage
+                            # engine.nonTurnPlayer.life -= opponent_damage # REMOVIDO
                         if player_damage > 0:
                             print(f"Você sofreu {player_damage} de dano de batalha.")
-                            engine.turnPlayer.life -= player_damage
-                        
-                        if attacker_destroyed:
+                            # engine.turnPlayer.life -= player_damage # REMOVIDO
+
+                        # Imprimir status da batalha
+                        if attacker_destroyed and target_destroyed and target:
+                            print("Empate de ATK! Ambos os monstros foram destruídos.")
+                        elif attacker_destroyed:
                             print(f"Seu monstro ({attacker.name}) foi destruído.")
-                            engine.turnPlayer.monsterIntoGraveyard(attacker)
-                        if target_destroyed and target: # 'target' pode ser None (ataque direto)
-                            print(f"O monstro do oponente ({target.name}) foi destruído.")
-                            engine.nonTurnPlayer.monsterIntoGraveyard(target)
-                        # atualiza o 'canAttack' do atacante se ele sobreviveu
-                        if not attacker_destroyed and attacker:
-                            attacker.canAttack = False
-                        if not attacker_destroyed and not target_destroyed and player_damage == 0 and opponent_damage == 0:
-                            if target: # Se foi batalha de monstros
-                                print("Nenhum monstro foi destruído (empate de ATK).")
-                            elif not target: # Se foi ataque direto (mas dano 0?)
-                                print("Ataque direto, mas nenhum dano foi causado.")
-                        
-                # Pausa para o jogador ler o resultado antes de voltar ao menu
-                input("\nPressione Enter para continuar...")
+                        elif target_destroyed and target:
+                            print(
+                                f"O monstro do oponente ({target.name}) foi destruído."
+                            )
+                        elif not target:  # Ataque direto
+                            if opponent_damage > 0:
+                                print(f"Ataque direto bem-sucedido!")
+                            else:
+                                print(f"Ataque direto, mas nenhum dano foi causado.")
+                        else:  # Ninguém destruído e sem dano (ex: 0 ATK vs 0 ATK com efeito)
+                            print("Nenhum monstro foi destruído na batalha.")
+
+                        ## 3. MOVER PARA O CEMITÉRIO (LÓGICA)
+                        # if attacker_destroyed:
+                        #    engine.turnPlayer.monsterIntoGraveyard(attacker)
+                        # if (
+                        #    target_destroyed and target
+                        # ):  # 'target' pode ser None (ataque direto)
+                        #    engine.nonTurnPlayer.monsterIntoGraveyard(target)
+                        #
+                        ## 4. ATUALIZAR 'canAttack' (se sobreviveu)
+                        # if not attacker_destroyed and attacker:
+                        #    attacker.canAttack = False
+
+                    # Pausa para o jogador ler o resultado antes de voltar ao menu
+                    input("\nPressione Enter para continuar...")
         else:
-            #print("\nAguardando jogada do oponente...")
+            # print("\nAguardando jogada do oponente...")
             # mostra a fase atual do oponente
-            #if engine.currentPhase == GamePhase.DRAW:
+            # if engine.currentPhase == GamePhase.DRAW:
             #    interface.displayPhase(
             #        engine.currentPhase.name, engine.turnPlayer.name, engine.turnCount
             #    )
             #    print(f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}")
 
-            #print(f"Aguardando jogada do oponente ({engine.turnPlayer.name})...")
+            # print(f"Aguardando jogada do oponente ({engine.turnPlayer.name})...")
 
             message = net.get_message()
 
             if not message:
                 time.sleep(0.5)  # Espera se não houver mensagens
                 continue  # Volta ao início do loop (ainda turno do oponente)
-        
+
             if message:
                 # LIMPA a linha de "loading" antes de imprimir a nova ação
                 # (Imprime 60 espaços em branco e volta ao início da linha)
                 print(" " * 60, end="\r")
                 sys.stdout.flush()
 
-            # Processa a mensagem recebida
+                # Processa a mensagem recebida
                 msg_type = message.get("tipo")
 
                 if msg_type == MessageType.PASSAR_TURNO:
                     # Chama a *nova* função que SÓ atualiza o estado local
                     engine.handle_opponent_pass_turn()
                     my_turn = True  # Pega o controle de volta
-                    opponent_header_printed = False # Prepara para o *próximo* turno dele
-                    
+                    opponent_header_printed = (
+                        False  # Prepara para o *próximo* turno dele
+                    )
+
                     print("\n" + "=" * 30)
                     print("É O SEU TURNO!")
                     print("=" * 30)
-            
 
                 elif msg_type == MessageType.MUDOU_FASE:
                     nova_fase_str = message.get("fase")
@@ -301,27 +324,36 @@ def run_game_loop(net, is_host, player, opponent):
                     # O oponente atacou, e esta é a resolução
                     engine.handle_opponent_battle_result(message)
 
+                elif msg_type == MessageType.SAIR:
+                    print("\nO oponente se desconectou ou a conexão foi perdida.")
+                    game_over = True
+                    break  # Sai imediatamente do loop 'while not game_over'
+
             else:
                 # Se o cabeçalho "Turno do Oponente" ainda não foi impresso
                 if not opponent_header_printed:
                     print("\n" + "=" * 40)
                     interface.displayPhase(
-                        engine.currentPhase.name, engine.turnPlayer.name, engine.turnCount
+                        engine.currentPhase.name,
+                        engine.turnPlayer.name,
+                        engine.turnCount,
                     )
-                    print(f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}")
+                    print(
+                        f"Sua Vida: {player.life} | Vida do Oponente: {opponent.life}"
+                    )
                     print("=" * 40)
-                    opponent_header_printed = True # Marca como impresso
-                    loading_dots = 0 # Reinicia a animação
+                    opponent_header_printed = True  # Marca como impresso
+                    loading_dots = 0  # Reinicia a animação
 
                 # Animação de "loading"
                 dots_str = "." * (loading_dots + 1)
-                
+
                 # Imprime na mesma linha. O `\r` retorna ao início da linha.
                 # O `{dots_str:<3}` garante que o espaço seja preenchido (limpa pontos antigos)
                 print(f"Aguardando jogada do oponente {dots_str:<3}", end="\r")
-                sys.stdout.flush() # Força a impressão imediata
-                
-                loading_dots = (loading_dots + 1) % 3      
+                sys.stdout.flush()  # Força a impressão imediata
+
+                loading_dots = (loading_dots + 1) % 3
 
             # elif received_message.get("tipo") == MessageType.SAIR:
             #    print("Oponente desconectado.")

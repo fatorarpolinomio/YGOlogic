@@ -58,10 +58,12 @@ class TempestadePesada(Card):
         # Limpando magias e armadilhas do controlador da carta
         for spellOrTrap in player.spellsAndTrapsInField:
             player.spellTrapIntoGraveyard(spellOrTrap)
+            player.spellsAndTrapsCount = 0
         player.spellsAndTrapsInField.clear()
         # Limpando magias e armadilhas do oponente
         for spellOrTrap in opponent.spellsAndTrapsInField:
             opponent.spellTrapIntoGraveyard(spellOrTrap)
+            opponent.spellsAndTrapsCount = 0
         opponent.spellsAndTrapsInField.clear()
         print("Alerta vermelho para tempestade forte (sem aula na each)")
         return
