@@ -30,21 +30,6 @@ class Raigeki(Card):
         return
 
 
-class DianKeto(Card):
-    def __init__(self):
-        super().__init__(
-            "Dian Keto, Mestre da Cura",
-            None,
-            CardType.SPELL,
-            "Ganhe 1000 pontos de vida.",
-        )
-
-    @override
-    def effect(self, player: Player, opponent: Player):
-        player.life += 1000
-        return
-
-
 class PoteDaGanancia(Card):
     def __init__(self):
         super().__init__(

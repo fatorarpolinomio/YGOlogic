@@ -18,7 +18,6 @@ def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
     player = Player(playerName, 4000)
     player.shuffleDeck()
     player.initialHand()
-    opponentName = ""
 
     if is_host:
         # espera o nome do oponente para poder criar o objeto dele
@@ -27,11 +26,11 @@ def setup_game(net: Network, is_host: bool) -> tuple[Player, Player]:
             opponent_name_data = net.get_message()
 
         opponent_name = opponent_name_data["name"]
-        net.send_message({"name": player.name})
+        net.send_message(MessageConstructor.definir_nome(player.name))
 
     else:  # Se for o convidado
         # Convidado envia seu nome primeiro
-        net.send_message({"name": playerName})
+        net.send_message(MessageConstructor.definir_nome(playerName))
         opponent_name_data = None
         while opponent_name_data is None:
             opponent_name_data = net.get_message()

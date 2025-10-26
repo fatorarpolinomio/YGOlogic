@@ -14,7 +14,6 @@ class Network:
         # flag para rastrear estado da conexão
         self.is_connected = False
 
-        
         # fila thread-safe para armazenar mensagens recebidas
         # a thread de recebimento 'coloca' (put) mensagens aqui
         # a thread principal (jogo) 'obtém' (get) mensagens daqui
@@ -52,7 +51,7 @@ class Network:
     def connect_to_game(self, host, port):
         "Configura o jogador como convidado (cliente) e tenta se conectar ao anfitrião"
         try:
-            # Tenta estabelecer uma conexão com o endereço e porta do servidor
+            # Tenta estabelecer uma conexão com o endereço e porta
             self.socket.connect((host, port))
             # Para o cliente, o socket principal é o mesmo da comunicação.
             self.conn = self.socket
@@ -135,7 +134,7 @@ class Network:
             print(f"Erro ao serializar mensagem: {e}")
             return False
 
-    def receive_message(self, timeout: Optional[float] = None):
+    def receive_message(self):
         "Recebe dados e retorna None se a conexão for perdida"
         # mesmo de send -> verificação de estado
         if not self.is_connected or self.conn is None:
@@ -143,9 +142,7 @@ class Network:
             return None
         
         try:
-            if timeout is not None:
-                self.conn.settimeout(timeout)
-
+        
             # recebe os bytes
             length_bytes = self.recv_exact(4)
 
@@ -169,9 +166,6 @@ class Network:
 
             return message
         
-        except socket.timeout:
-            print("Timeout ao aguardar mensagem.")
-            return None
         except (socket.error, ConnectionResetError) as e:
             print(f"Erro de conexão ao receber: {e}")
             return None
@@ -181,9 +175,6 @@ class Network:
         except UnicodeDecodeError as e:
             print(f"Erro de codificação UTF-8: {e}")
             return None
-        finally:
-            if timeout is not None:
-                self.conn.settimeout(None)
 
     def recv_exact(self, num_bytes: int):
         "recebe exatamente num_bytes bytes ou None se desconectou"
@@ -211,19 +202,22 @@ class Network:
             try:
                 # shutdown para nao permitir mais send/receive
                 self.conn.shutdown(socket.SHUT_RDWR)
-            except socket.error:
-                pass # ignora erros se já estiver fechado
-                self.conn.close()
+            except socket.error as e:
+                print(f"Ignorando erro no shutdown de conn: {e}")
+            
+            try:
+                self.conn.close() # fecha o socket de conexão
                 print("Conexão fechada")
             except socket.error as e:
                 print(f"Erro ao fechar a conexão: {e}")
         
         # fecha o socket principal
         try:
-            if self.socket.fileno() != -1:
+            if self.socket.fileno() != -1:    # verifica se já não está fechado
                 self.socket.shutdown(socket.SHUT_RDWR)
-        except (socket.error, OSError):
-            pass  # Ignora erro se não estiver conectado
+        except (socket.error, OSError) as e:
+            print(f"Ignorando erro no shutdown do socket principal: {e}")
+
         try:
             self.socket.close()
             print("Socket principal fechado.")

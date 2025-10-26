@@ -11,6 +11,7 @@ class MessageType:
     "Classe para definir os tipos de mensagens possíveis"
 
     # Setup e controle de jogo
+    DEFINIR_NOME = "DEFINIR_NOME"
     SETUP_JOGO = "SETUP_JOGO"
     INICIAR_TURNO = "INICIAR_TURNO"
     PASSAR_TURNO = "PASSAR_TURNO"
@@ -40,6 +41,18 @@ class MessageType:
 class MessageConstructor:
     "classe responsável por construir mensagens seguindo o protocolo"
 
+    @staticmethod
+    def definir_nome(nome_jogador):  # <-- ADICIONE ESTE MÉTODO
+        """
+        Sintaxe: {"tipo": "DEFINIR_NOME", "name": str}
+        Gramática: "tipo" = "DEFINIR_NOME" | name = nome do jogador (str)
+        Semântica: Enviado no início da conexão para trocar nomes.
+        """
+        return {
+            "tipo": MessageType.DEFINIR_NOME,
+            "name": nome_jogador
+        }
+    
     @staticmethod
     def setup_jogo(mao_inicial):
         """
