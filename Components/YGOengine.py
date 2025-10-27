@@ -41,7 +41,7 @@ class YGOengine:
         self.network = network
         self.is_host = is_host
 
-        # NOVO: Adiciona um estado para rastrear um ataque em andamento
+        # Adicionando um estado para rastrear um ataque em andamento
         self.pending_attack = (
             None  # Vai armazenar (attacker_obj, target_obj, attacker_idx, target_idx)
         )
@@ -333,7 +333,7 @@ class YGOengine:
         if not attackerMonster.canAttack:
             return  # Ou envia uma mensagem de erro para o cliente
 
-        # 1. Envia a declaração de ataque e ESPERA a resposta
+        # Envia a declaração de ataque e espera a resposta
         attacker_idx = attackingPlayer.monstersInField.index(attackerMonster)
         target_idx = (
             defendingPlayer.monstersInField.index(targetMonster)
@@ -379,8 +379,7 @@ class YGOengine:
 
         else:
             results = self.damageCalc(attackerMonster, targetMonster)
-            # APLICAÇÃO DE DANO E CEMITÉRIO FOI MOVIDA PARA O Main.py
-            # (O Main.py já está fazendo isso nas linhas 250-267)
+     
 
             attackingPlayer.life -= results["playerDamage"]
             defendingPlayer.life -= results["opponentDamage"]
@@ -417,10 +416,10 @@ class YGOengine:
                 "defensor_destruido": results["targetDestroyed"],
             }
 
-            # Retorna o dicionário formatado para o Main.py
+            # Retorna o dicionário formatado para o Main
             return return_results
 
-    # **Métodos (handlers) para processar mensagens recebidas do oponente***
+    # **Métodos (handlers) para processar mensagens recebidas do oponente*** | foram gerados com auxílio de IA
 
     def handle_opponent_pass_turn(self):
         """
@@ -459,9 +458,9 @@ class YGOengine:
                 print("Erro de rede: Mensagem INVOCAR_MONSTRO sem card_data.")
                 return
 
-            # Criamos um "dummy monster" (um objeto monstro local)
+            # Cria um "dummy monster" (um objeto monstro local)
             # com os dados recebidos para representar a carta do oponente.
-            # NOTA: Isso assume que seu construtor de Monstro aceita
+            # Isso assume que seu construtor de Monstro aceita
             # (name, level, attribute, type, ATK, DEF, description)
             # Se for diferente, ajuste aqui.
             card_type_str = card_data.get("type")
@@ -574,7 +573,7 @@ class YGOengine:
             attacker_idx = payload.get("attacker_index")
             target_idx = payload.get("target_index")
 
-            # 1. Validar o índice do Atacante
+            # Validar o índice do Atacante
             if (
                 attacker_idx is None
                 or attacker_idx < 0
@@ -612,7 +611,7 @@ class YGOengine:
             # Pega o monstro alvo (local)
             target_monster = self.nonTurnPlayer.monstersInField[target_idx]
 
-            # 1. Pergunta ao engine se o defensor (local) tem armadilhas
+            # Pergunta ao engine se o defensor (local) tem armadilhas
             #    Passando 'self.nonTurnPlayer' como o defensor
             valid_traps = self.checkForTrapResponse(
                 self.nonTurnPlayer, attacker_monster
@@ -625,7 +624,7 @@ class YGOengine:
                     valid_traps, attacker_monster
                 )
 
-            # 3. Responde ao atacante
+            # Responde ao atacante
             if trap_to_activate:
                 # Ativa a armadilha localmente
                 # 'self.nonTurnPlayer' é o jogador local ativando a armadilha
@@ -699,7 +698,7 @@ class YGOengine:
 
             print("\n--- Resultado da Batalha ---")
 
-            # 1. Aplicar dano
+            # Aplicar dano
             if dano_ao_oponente > 0:
                 self.turnPlayer.life -= dano_ao_oponente
                 print(
@@ -711,7 +710,7 @@ class YGOengine:
                     f"Você ({self.nonTurnPlayer.name}) sofre {dano_ao_local} de dano."
                 )
 
-            # 2. Mover monstros destruídos para o cemitério
+            # Mover monstros destruídos para o cemitério
             if oponente_destruido and monster_atacante:
                 print(f"Monstro do oponente '{monster_atacante.name}' foi destruído.")
                 self.turnPlayer.monsterIntoGraveyard(monster_atacante)
@@ -728,7 +727,7 @@ class YGOengine:
             ):
                 print("Nenhum monstro foi destruído e nenhum dano foi sofrido.")
 
-            # 3. Atualizar 'canAttack' do monstro atacante (se ele não foi destruído)
+            # Atualizar 'canAttack' do monstro atacante (se ele não foi destruído)
             if not oponente_destruido and monster_atacante:
                 monster_atacante.canAttack = False
 
