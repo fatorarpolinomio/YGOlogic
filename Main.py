@@ -195,8 +195,7 @@ def run_game_loop(net, is_host, player, opponent):
                         engine.turnPlayer, engine.nonTurnPlayer, attacker, target
                     )
 
-                # --- INÍCIO DA CORREÇÃO ---
-                # Agora, processamos o 'battleResult' em AMBOS os casos
+                
 
                 if battleResult:  # Verifica se a batalha realmente aconteceu
                     if battleResult.get("attack_negated"):
@@ -275,7 +274,7 @@ def run_game_loop(net, is_host, player, opponent):
                 continue  # Volta ao início do loop (ainda turno do oponente)
 
             if message:
-                # LIMPA a linha de "loading" antes de imprimir a nova ação
+                # Limpa a linha de "loading" antes de imprimir a nova ação
                 # (Imprime 60 espaços em branco e volta ao início da linha)
                 print(" " * 60, end="\r")
                 sys.stdout.flush()
@@ -345,7 +344,7 @@ def run_game_loop(net, is_host, player, opponent):
                     opponent_header_printed = True  # Marca como impresso
                     loading_dots = 0  # Reinicia a animação
 
-                # Animação de "loading"
+                # Animação de "loading" => tentativa criada por IA
                 dots_str = "." * (loading_dots + 1)
 
                 # Imprime na mesma linha. O `\r` retorna ao início da linha.
