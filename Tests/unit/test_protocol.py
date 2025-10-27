@@ -1,3 +1,5 @@
+# Código deste teste foi realizado com auxílio do Gemini 2.5 Pro como dito no relatório
+
 import unittest
 from Communication.messages_protocol import MessageConstructor, MessageType
 

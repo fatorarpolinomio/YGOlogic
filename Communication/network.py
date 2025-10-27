@@ -32,6 +32,7 @@ class Network:
     def host_game(self, host, port):
         "Configura o jogador como anfitrião (servidor) e espera por uma conexão"
         try:
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             # Associa o socket a um endereço IP e uma porta específicos
             self.socket.bind((host, port))
             # coloca o socket em modo de escuta, aguardando por 1 conexão na fila

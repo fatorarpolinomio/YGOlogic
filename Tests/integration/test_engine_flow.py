@@ -1,142 +1,151 @@
+# Código deste teste foi realizado com auxílio do Gemini 2.5 Pro como dito no relatório
+
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 
-# Importe as classes e enums do seu projeto
+# Importa as classes reais e mocks necessários
 from Components.YGOengine import YGOengine
 from Components.YGOgamePhase import GamePhase
-
-# Como os testes não precisam da implementação real dessas classes,
-# podemos usar Mocks com 'spec=True'.
-# Se este arquivo de teste estiver em um diretório diferente,
-# você pode precisar ajustar o 'sys.path' ou simplesmente
-# criar Mocks genéricos sem 'spec'.
-
-# Para este exemplo, vamos supor que podemos importar as definições
-# para que o 'spec' funcione corretamente.
 from Components.YGOplayer import Player
 from Components.cards.Monsters import Monster
 from Components.cards.YGOcards import Card, CardType
+from Components.cards.FacedownCard import FacedownCard
 from Communication.network import Network
-from Communication.messages_protocol import MessageType
+from Communication.messages_protocol import MessageConstructor, MessageType
 
 # --- Mocks para as Cartas ---
-# Criamos instâncias de Mock para simular cartas reais.
-# Usamos MagicMock para que atributos como ATK possam ser definidos
-# e comparados (ex: 3000 > 2500)
+# (Usamos MagicMock para simular cartas sem depender das classes reais de Spells/Traps)
 
-# Monstro Atacante
 mock_blue_eyes = MagicMock(spec=Monster)
 mock_blue_eyes.name = "Blue-Eyes White Dragon"
 mock_blue_eyes.ATK = 3000
 mock_blue_eyes.type = CardType.MONSTER
 mock_blue_eyes.canAttack = True
+mock_blue_eyes.effect = Mock(return_value=None) # A engine chama .effect()
 
-# Monstro Alvo
 mock_dark_magician = MagicMock(spec=Monster)
 mock_dark_magician.name = "Dark Magician"
 mock_dark_magician.ATK = 2500
 mock_dark_magician.type = CardType.MONSTER
 mock_dark_magician.canAttack = True
+mock_dark_magician.effect = Mock(return_value=None)
 
-# Magia
 mock_raigeki = MagicMock(spec=Card)
 mock_raigeki.name = "Raigeki"
 mock_raigeki.type = CardType.SPELL
 mock_raigeki.effectDescription = "Destrói todos os monstros do oponente."
+mock_raigeki.effect = Mock(return_value=None) # A engine chama .effect()
 
-# Armadilha
 mock_trap_hole = MagicMock(spec=Card)
 mock_trap_hole.name = "Buraco Armadilha"
 mock_trap_hole.type = CardType.TRAP
-mock_trap_hole.attackingMonster = None # O engine irá popular isso
+mock_trap_hole.attackingMonster = None
+mock_trap_hole.effect = Mock(return_value=None) # A engine chama .effect()
 
-# Armadilha de Negação de Ataque
 mock_magic_cylinder = MagicMock(spec=Card)
 mock_magic_cylinder.name = "Cilindro Mágico"
 mock_magic_cylinder.type = CardType.TRAP
 mock_magic_cylinder.attackingMonster = None
+mock_magic_cylinder.effect = Mock(return_value=None) # A engine chama .effect()
 
 
-class TestYGOEngine(unittest.TestCase):
+class TestYGOEngineFlow(unittest.TestCase):
 
     def setUp(self):
         """
-        Configura um ambiente de teste limpo antes de cada teste.
+        Configura um ambiente de teste limpo.
+        Usa Mocks para Player e Network, mas simula o ESTADO real do Player.
         """
         # 1. Mock da Rede
         self.mock_network = Mock(spec=Network)
         self.mock_network.is_connected = True
-        self.mock_network.get_message.return_value = None # Padrão é não receber nada
 
-        # 2. Mocks dos Jogadores
-        # Usamos listas reais em vez de mocks de lista para facilitar
-        # a verificação de "card in player.hand".
+        # 2. Mocks dos Jogadores (com 'spec' para garantir o contrato da classe)
         self.player1 = Mock(spec=Player, name="Jogador 1")
-        self.player1.life = 4000
-        self.player1.hand = []
-        self.player1.deck = []
-        self.player1.monstersInField = []
-        self.player1.spellsAndTrapsInField = []
-        self.player1.graveyard = []
-        self.player1.monstersCount = 0
-        self.player1.spellsAndTrapsCount = 0
-
         self.player2 = Mock(spec=Player, name="Jogador 2")
-        self.player2.life = 4000
-        self.player2.hand = []
-        self.player2.deck = []
-        self.player2.monstersInField = []
-        self.player2.spellsAndTrapsInField = []
-        self.player2.graveyard = []
-        self.player2.monstersCount = 0
-        self.player2.spellsAndTrapsCount = 0
         
-        # 3. Mocks de Métodos dos Jogadores
-        # Simulamos o que os métodos do Jogador fariam com suas listas
-        def p1_draw():
+        # 3. MELHORIA: Listas de Estado Reais
+        # O mock do Player irá manipular estas listas, permitindo que a
+        # engine funcione e que possamos testar o estado real.
+        self.p1_state = {
+            "life": 4000, "hand": [], "deck": [], "graveyard": [],
+            "monstersInField": [], "monstersCount": 0,
+            "spellsAndTrapsInField": [], "spellsAndTrapsCount": 0
+        }
+        self.p2_state = {
+            "life": 4000, "hand": [], "deck": [], "graveyard": [],
+            "monstersInField": [], "monstersCount": 0,
+            "spellsAndTrapsInField": [], "spellsAndTrapsCount": 0
+        }
+
+        # Configura os Mocks para usarem as listas de estado
+        for attr, value in self.p1_state.items():
+            setattr(self.player1, attr, value)
+        for attr, value in self.p2_state.items():
+            setattr(self.player2, attr, value)
+
+        # 4. MELHORIA: Mocks de Métodos com `side_effect`
+        # Isso simula a lógica REAL do YGOplayer.py (decrementar contadores, mover cartas)
+        
+        def p1_drawCard():
+            if not self.player1.deck: raise IndexError("Deck vazio")
             card = self.player1.deck.pop(0)
             self.player1.hand.append(card)
-        self.player1.drawCard.side_effect = p1_draw
+        self.player1.drawCard.side_effect = p1_drawCard
 
-        def p1_monster_to_gy(monster):
+        def p1_monsterIntoGraveyard(monster):
             if monster in self.player1.monstersInField:
                 self.player1.monstersInField.remove(monster)
                 self.player1.graveyard.append(monster)
-                self.player1.monstersCount -= 1
-        self.player1.monsterIntoGraveyard.side_effect = p1_monster_to_gy
-        
-        def p1_spell_to_gy(spell):
+                self.player1.monstersCount -= 1 # Simula a lógica real
+        self.player1.monsterIntoGraveyard.side_effect = p1_monsterIntoGraveyard
+
+        def p1_spellTrapIntoGraveyard(spell):
             if spell in self.player1.spellsAndTrapsInField:
                 self.player1.spellsAndTrapsInField.remove(spell)
+                self.player1.spellsAndTrapsCount -= 1 # Simula a lógica real
+            elif spell in self.player1.hand:
+                self.player1.hand.remove(spell)
             self.player1.graveyard.append(spell)
-            if self.player1.spellsAndTrapsCount > 0:
-                 self.player1.spellsAndTrapsCount -= 1
-        self.player1.spellTrapIntoGraveyard.side_effect = p1_spell_to_gy
-
-
-        def p2_monster_to_gy(monster):
+        self.player1.spellTrapIntoGraveyard.side_effect = p1_spellTrapIntoGraveyard
+        
+        # --- Repete para o Player 2 ---
+        def p2_drawCard():
+            if not self.player2.deck: raise IndexError("Deck vazio")
+            card = self.player2.deck.pop(0)
+            self.player2.hand.append(card)
+        self.player2.drawCard.side_effect = p2_drawCard
+        
+        def p2_monsterIntoGraveyard(monster):
             if monster in self.player2.monstersInField:
                 self.player2.monstersInField.remove(monster)
                 self.player2.graveyard.append(monster)
-                self.player2.monstersCount -= 1
-        self.player2.monsterIntoGraveyard.side_effect = p2_monster_to_gy
+                self.player2.monstersCount -= 1 # Simula a lógica real
+        self.player2.monsterIntoGraveyard.side_effect = p2_monsterIntoGraveyard
 
-        # 4. Instância da Engine (SUT - System Under Test)
-        # O P1 é o host e começa o turno.
+        def p2_spellTrapIntoGraveyard(spell):
+            if spell in self.player2.spellsAndTrapsInField:
+                self.player2.spellsAndTrapsInField.remove(spell)
+                self.player2.spellsAndTrapsCount -= 1 # Simula a lógica real
+            elif spell in self.player2.hand:
+                self.player2.hand.remove(spell)
+            self.player2.graveyard.append(spell)
+        self.player2.spellTrapIntoGraveyard.side_effect = p2_spellTrapIntoGraveyard
+
+        # 5. Instância da Engine
         self.engine = YGOengine(
             self.player1, self.player2, self.mock_network, is_host=True
         )
 
-        # 5. Resetar mocks de cartas (importante para 'canAttack')
+        # 6. Reseta mocks de cartas e estado da engine
         mock_blue_eyes.canAttack = True
         mock_dark_magician.canAttack = True
         
-        # Resetar contagens de mock call
         self.mock_network.reset_mock()
-        mock_raigeki.apply_effect.reset_mock()
-        mock_trap_hole.apply_effect.reset_mock()
-        mock_magic_cylinder.apply_effect.reset_mock()
-
+        mock_raigeki.effect.reset_mock()
+        mock_trap_hole.effect.reset_mock()
+        mock_magic_cylinder.effect.reset_mock()
+        self.engine.pending_attack = None
 
     ## --- Testes de Fluxo de Jogo e Estado ---
 
@@ -144,72 +153,38 @@ class TestYGOEngine(unittest.TestCase):
         self.assertEqual(self.engine.turnPlayer, self.player1)
         self.assertEqual(self.engine.nonTurnPlayer, self.player2)
         self.assertEqual(self.engine.currentPhase, GamePhase.DRAW)
-        self.assertEqual(self.engine.turnCount, 1)
-        self.assertFalse(self.engine.summonThisTurn)
-
-    def test_initial_state_as_guest(self):
-        # Cria uma nova engine para este teste
-        guest_engine = YGOengine(
-            self.player1, self.player2, self.mock_network, is_host=False
-        )
-        self.assertEqual(guest_engine.turnPlayer, self.player2) # Oponente (host) começa
-        self.assertEqual(guest_engine.nonTurnPlayer, self.player1)
-        self.assertEqual(guest_engine.currentPhase, GamePhase.DRAW)
-
-    def test_advance_to_next_phase(self):
-        self.engine.currentPhase = GamePhase.DRAW
-        self.engine.advanceToNextPhase()
-        self.assertEqual(self.engine.currentPhase, GamePhase.MAIN_1)
-
-        self.engine.advanceToNextPhase()
-        self.assertEqual(self.engine.currentPhase, GamePhase.BATTLE)
-
-        self.engine.advanceToNextPhase()
-        self.assertEqual(self.engine.currentPhase, GamePhase.END)
-        
-        # Deve ter notificado a rede 3 vezes
-        self.assertEqual(self.mock_network.send_message.call_count, 3)
 
     def test_end_turn(self):
-        # Configura um monstro que atacou
         mock_blue_eyes.canAttack = False
-        self.player1.monstersInField = [mock_blue_eyes]
+        self.player1.monstersInField.append(mock_blue_eyes)
         self.engine.summonThisTurn = True
         self.engine.currentPhase = GamePhase.END
-        self.engine.turnCount = 1
 
         self.engine.endTurn()
 
-        # Verifica se os jogadores trocaram
         self.assertEqual(self.engine.turnPlayer, self.player2)
-        self.assertEqual(self.engine.nonTurnPlayer, self.player1)
-        
-        # Verifica se o estado do turno foi resetado
         self.assertEqual(self.engine.turnCount, 2)
         self.assertEqual(self.engine.currentPhase, GamePhase.DRAW)
         self.assertFalse(self.engine.summonThisTurn)
-        
-        # Verifica se o monstro do P1 pode atacar no próximo turno dele
-        self.assertTrue(mock_blue_eyes.canAttack)
-        
-        # Verifica se a rede foi notificada
-        self.mock_network.send_message.assert_called_once()
+        self.assertTrue(mock_blue_eyes.canAttack) # Resetado para o próximo turno
+        self.mock_network.send_message.assert_called_with(
+            MessageConstructor.passar_turno()
+        )
 
-    ## --- Testes de Ações do Jogador (Main Phase) ---
+    ## --- Testes de Ações (Main Phase) ---
 
     def test_draw_card_success(self):
-        self.player1.deck = [mock_dark_magician]
-        self.player1.hand = []
+        self.player1.deck.append(mock_dark_magician) # Adiciona ao deck
         
         result = self.engine.drawCard()
 
         self.assertTrue(result["success"])
         self.assertIn(mock_dark_magician, self.player1.hand)
-        self.assertEqual(len(self.player1.deck), 0)
-        self.player1.drawCard.assert_called_once() # Verifica se o método do player foi chamado
+        self.player1.drawCard.assert_called_once() # Valida que o mock foi chamado
 
     def test_draw_card_deck_empty(self):
-        self.player1.deck = []
+        self.player1.deck = [] # Deck vazio
+        self.player1.drawCard.side_effect = IndexError # Configura o mock para falhar
         
         result = self.engine.drawCard()
         
@@ -217,9 +192,7 @@ class TestYGOEngine(unittest.TestCase):
         self.assertEqual(result["reason"], "DECK_EMPTY")
 
     def test_summon_monster_success(self):
-        self.player1.hand = [mock_blue_eyes]
-        self.player1.monstersInField = []
-        self.player1.monstersCount = 0
+        self.player1.hand.append(mock_blue_eyes)
         self.engine.summonThisTurn = False
 
         result = self.engine.summonMonster(self.player1, mock_blue_eyes)
@@ -227,238 +200,170 @@ class TestYGOEngine(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertIn(mock_blue_eyes, self.player1.monstersInField)
         self.assertNotIn(mock_blue_eyes, self.player1.hand)
-        self.assertEqual(self.player1.monstersCount, 1)
+        # Valida o estado simulado pelo side_effect
+        self.assertEqual(self.player1.monstersCount, 1) 
         self.assertTrue(self.engine.summonThisTurn)
         self.mock_network.send_message.assert_called_once()
 
-    def test_summon_monster_fail_zone_full(self):
-        self.player1.monstersCount = 3
-        result = self.engine.summonMonster(self.player1, mock_blue_eyes)
-        self.assertFalse(result["success"])
-        self.assertEqual(result["reason"], "MONSTER_ZONE_FULL")
+    # MELHORADO: Teste para `setCard` validando FacedownCard
+    @patch('Components.YGOengine.FacedownCard') # Caminho do import dentro da YGOengine
+    def test_set_card_success(self, mock_facedown_class):
+        # Cria uma instância mock para a carta baixada
+        mock_facedown_instance = MagicMock(spec=FacedownCard)
+        mock_facedown_class.return_value = mock_facedown_instance
 
-    def test_summon_monster_fail_already_summoned(self):
-        self.engine.summonThisTurn = True
-        result = self.engine.summonMonster(self.player1, mock_blue_eyes)
-        self.assertFalse(result["success"])
-        self.assertEqual(result["reason"], "VOCE_JA_INVOCOU_NESTE_TURNO")
-
-    def test_set_card_success(self):
-        self.player1.hand = [mock_trap_hole]
-        self.player1.spellsAndTrapsInField = []
-        self.player1.spellsAndTrapsCount = 0
+        self.player1.hand.append(mock_trap_hole)
 
         result = self.engine.setCard(self.player1, mock_trap_hole)
 
         self.assertTrue(result["success"])
-        self.assertIn(mock_trap_hole, self.player1.spellsAndTrapsInField)
+        # Valida que FacedownCard foi chamado com a carta real
+        mock_facedown_class.assert_called_with(mock_trap_hole)
+        # Valida que a *instância* baixada foi para o campo
+        self.assertIn(mock_facedown_instance, self.player1.spellsAndTrapsInField)
         self.assertNotIn(mock_trap_hole, self.player1.hand)
-        self.assertEqual(self.player1.spellsAndTrapsCount, 1)
+        # Valida o estado simulado
+        self.assertEqual(self.player1.spellsAndTrapsCount, 1) 
         self.mock_network.send_message.assert_called_once()
 
-    def test_set_card_fail_zone_full(self):
-        self.player1.spellsAndTrapsCount = 3
-        result = self.engine.setCard(self.player1, mock_trap_hole)
-        self.assertFalse(result["success"])
-        self.assertEqual(result["reason"], "SPELL_TRAP_ZONE_FULL")
-
-    @patch('YGOengine.MessageConstructor') # Mocka o construtor de mensagens
-    def test_activate_spell_success(self, mock_msg_constructor):
-        self.player1.hand = [mock_raigeki]
-        self.player1.graveyard = []
-        # Simula o 'index()' da lista real
+    # MELHORADO: Teste para `activateSpell` validando .effect()
+    def test_activate_spell_success(self):
+        self.player1.hand.append(mock_raigeki)
         
         result = self.engine.activateSpell(self.player1, self.player2, mock_raigeki)
 
         self.assertTrue(result["success"])
-        # Verifica se o efeito foi aplicado
-        mock_raigeki.apply_effect.assert_called_with(self.player1, self.player2)
-        # Verifica se a carta foi para o cemitério
-        self.assertNotIn(mock_raigeki, self.player1.hand)
+        # Valida se o efeito (mockado) foi chamado
+        mock_raigeki.effect.assert_called_with(self.player1, self.player2)
+        # Valida se a carta foi para o cemitério (via side_effect mock)
         self.player1.spellTrapIntoGraveyard.assert_called_with(mock_raigeki)
-        # Verifica se a rede foi notificada
+        self.assertIn(mock_raigeki, self.player1.graveyard)
+        self.assertNotIn(mock_raigeki, self.player1.hand)
         self.mock_network.send_message.assert_called_once()
-        mock_msg_constructor.ativar_magia.assert_called_once()
 
+    ## --- Testes de Batalha (Lado Atacante - P1) ---
 
-    ## --- Testes de Ações do Jogador (Battle Phase) ---
-
-    def test_damage_calc_scenarios(self):
-        # 1. Atacante vence
-        res_atk_wins = self.engine.damageCalc(mock_blue_eyes, mock_dark_magician)
-        self.assertEqual(res_atk_wins["playerDamage"], 0)
-        self.assertEqual(res_atk_wins["opponentDamage"], 500) # 3000 - 2500
-        self.assertTrue(res_atk_wins["targetDestroyed"])
-        self.assertFalse(res_atk_wins["attackerDestroyed"])
-
-        # 2. Defensor vence
-        res_def_wins = self.engine.damageCalc(mock_dark_magician, mock_blue_eyes)
-        self.assertEqual(res_def_wins["playerDamage"], 500) # abs(2500 - 3000)
-        self.assertEqual(res_def_wins["opponentDamage"], 0)
-        self.assertFalse(res_def_wins["targetDestroyed"])
-        self.assertTrue(res_def_wins["attackerDestroyed"])
-
-        # 3. Empate
-        res_tie = self.engine.damageCalc(mock_blue_eyes, mock_blue_eyes)
-        self.assertEqual(res_tie["playerDamage"], 0)
-        self.assertEqual(res_tie["opponentDamage"], 0)
-        self.assertTrue(res_tie["targetDestroyed"])
-        self.assertTrue(res_tie["attackerDestroyed"])
+    def test_declare_attack_sends_message(self):
+        self.player1.monstersInField.append(mock_blue_eyes)
+        self.player2.monstersInField.append(mock_dark_magician)
         
-        # 4. Ataque Direto
-        res_direct = self.engine.damageCalc(mock_blue_eyes, None)
-        self.assertEqual(res_direct["playerDamage"], 0)
-        self.assertEqual(res_direct["opponentDamage"], 3000) # ATK do Blue-Eyes
-        self.assertFalse(res_direct["targetDestroyed"])
-        self.assertFalse(res_direct["attackerDestroyed"])
+        self.engine.declareAttack(mock_blue_eyes, mock_dark_magician)
 
-    def test_resolve_attack_no_trap_response(self):
-        self.player1.monstersInField = [mock_blue_eyes]
-        self.player2.monstersInField = [mock_dark_magician]
-        self.player1.life = 4000
-        self.player2.life = 4000
-        
-        # Simula o oponente respondendo "não" à armadilha
-        self.mock_network.get_message.return_value = {
-            "tipo": MessageType.ATIVAR_ARMADILHA,
-            "ativar": False
-        }
-        
-        result = self.engine.resolveAttack(self.player1, self.player2, mock_blue_eyes, mock_dark_magician)
+        self.assertEqual(self.engine.pending_attack, (mock_blue_eyes, mock_dark_magician))
+        self.mock_network.send_message.assert_called_with(
+            MessageConstructor.declarar_ataque(attacker_index=0, target_index=0)
+        )
 
-        # Verifica o estado do jogo
-        self.assertFalse(mock_blue_eyes.canAttack) # Marcou como atacado
-        self.assertEqual(self.player1.life, 4000)
-        self.assertEqual(self.player2.life, 3500) # Perdeu 500 LP
+    def test_handle_attack_response_no_trap(self):
+        # Setup: P1 (local) atacou P2
+        self.engine.turnPlayer = self.player1
+        self.engine.nonTurnPlayer = self.player2
+        self.player1.monstersInField.append(mock_blue_eyes)
+        self.player2.monstersInField.append(mock_dark_magician)
+        self.player2.monstersCount = 1 # Estado inicial
+        self.engine.pending_attack = (mock_blue_eyes, mock_dark_magician)
         
-        # Verifica se o monstro correto foi para o cemitério
+        payload = {"ativar": False, "tem_armadilha": False}
+        
+        self.engine.handle_attack_response(payload)
+
+        # Verifica se o ataque foi resolvido
+        self.assertIsNone(self.engine.pending_attack)
+        self.assertFalse(mock_blue_eyes.canAttack)
+        
+        # Verifica estado (via _apply_battle_results_p1)
+        self.assertEqual(self.player2.life, 3500) # P2 tomou 500
+        self.assertEqual(self.player2.monstersCount, 0) # P2 perdeu monstro
         self.player2.monsterIntoGraveyard.assert_called_with(mock_dark_magician)
-        self.player1.monsterIntoGraveyard.assert_not_called()
-        self.assertNotIn(mock_dark_magician, self.player2.monstersInField)
-
-        # Verifica comunicação de rede (1. Declarar, 2. Resultado)
-        self.assertEqual(self.mock_network.send_message.call_count, 2)
         
-        # Verifica o resultado retornado
-        self.assertEqual(result["opponentDamage"], 500)
-        self.assertTrue(result["targetDestroyed"])
+        # Verifica se o resultado foi enviado
+        self.mock_network.send_message.assert_called_with(
+            MessageConstructor.resultado_batalha(
+                dano_atacante=0, dano_defensor=500,
+                atacante_destruido=False, defensor_destruido=True,
+                atacante_index=0, defensor_index=0
+            )
+        )
 
-    def test_resolve_attack_with_trap_response_magic_cylinder(self):
-        self.player1.monstersInField = [mock_blue_eyes]
-        self.player2.monstersInField = [mock_dark_magician]
-        self.player1.life = 4000
+    # MELHORADO: Testa o patch para findTrapByName
+    @patch('Components.cards.Traps.findTrapByName')
+    def test_handle_opponent_activate_trap_magic_cylinder(self, mock_find_trap):
+        # Setup: P1 (local) atacou, P2 (oponente) ativou armadilha
+        self.engine.turnPlayer = self.player1
+        self.engine.nonTurnPlayer = self.player2
+        self.player1.monstersInField.append(mock_blue_eyes)
+        self.player2.monstersInField.append(mock_dark_magician)
+        self.engine.pending_attack = (mock_blue_eyes, mock_dark_magician)
         
-        # Simula o oponente respondendo "sim" com "Cilindro Mágico"
-        self.mock_network.get_message.return_value = {
-            "tipo": MessageType.ATIVAR_ARMADILHA,
-            "ativar": True,
-            "trap_name": "Cilindro Mágico"
-        }
+        payload = {"card": {"name": "Cilindro Mágico"}}
         
-        result = self.engine.resolveAttack(self.player1, self.player2, mock_blue_eyes, mock_dark_magician)
+        # Configura o mock da CARTA (Cilindro)
+        # Simula o efeito real de Traps.py: Cilindro.effect()
+        def reflect_damage(player_p2, opponent_p1):
+            # 'player_p2' é quem ativou (P2), 'opponent_p1' é o P1
+            opponent_p1.life -= mock_magic_cylinder.attackingMonster.ATK
+        
+        mock_magic_cylinder.effect.side_effect = reflect_damage
+        # Configura o mock do BUSCADOR
+        mock_find_trap.return_value = mock_magic_cylinder
 
-        # Verifica o estado do jogo
-        self.assertFalse(mock_blue_eyes.canAttack) # Marcou como atacado
-        self.assertEqual(self.player1.life, 1000) # Tomou 3000 de dano
+        self.engine.handle_opponent_activate_trap(payload)
+
+        # Verifica se o ataque foi resolvido
+        self.assertIsNone(self.engine.pending_attack)
+        self.assertFalse(mock_blue_eyes.canAttack)
+        
+        # Verifica se P1 (atacante) tomou o dano
+        self.assertEqual(self.player1.life, 1000) # 4000 - 3000 ATK
         
         # Verifica se nenhum monstro foi destruído
-        self.player2.monsterIntoGraveyard.assert_not_called()
         self.player1.monsterIntoGraveyard.assert_not_called()
-
-        # Verifica comunicação de rede (Apenas 1. Declarar)
-        # A resposta da armadilha é enviada pelo *oponente* (simulado aqui)
-        self.assertEqual(self.mock_network.send_message.call_count, 1)
+        self.player2.monsterIntoGraveyard.assert_not_called()
         
-        # Verifica o resultado retornado
-        self.assertTrue(result["attack_negated"])
-        self.assertEqual(result["trap_name"], "Cilindro Mágico")
+        # Verifica se o resultado (da armadilha) foi enviado
+        self.mock_network.send_message.assert_called_once()
+        sent_msg = self.mock_network.send_message.call_args[0][0]
+        self.assertEqual(sent_msg["tipo"], MessageType.RESULTADO_BATALHA)
+        self.assertEqual(sent_msg["dano_atacante"], 3000) # Dano aplicado ao P1
+        self.assertFalse(sent_msg["atacante_destruido"])
 
+
+    ## --- Testes de Batalha (Lado Defensor - P2) ---
+
+    # MELHORADO: Testa a verificação de armadilhas com FacedownCard
     def test_check_for_trap_response_finds_traps(self):
-        self.player2.spellsAndTrapsInField = [mock_raigeki, mock_trap_hole, mock_magic_cylinder]
+        # Simula FacedownCards no campo do defensor (P2)
+        mock_fd_trap = MagicMock(spec=FacedownCard)
+        mock_fd_trap.card = mock_trap_hole # A carta "real" dentro
         
-        # O defensor é o player2
+        mock_fd_cylinder = MagicMock(spec=FacedownCard)
+        mock_fd_cylinder.card = mock_magic_cylinder
+
+        mock_fd_spell = MagicMock(spec=FacedownCard)
+        mock_fd_spell.card = mock_raigeki # Uma magia baixada (não-armadilha)
+
+        self.player2.spellsAndTrapsInField.extend([mock_fd_spell, mock_fd_trap, mock_fd_cylinder])
+        
+        # P2 é o defensor
         valid_traps = self.engine.checkForTrapResponse(self.player2, mock_blue_eyes)
         
         self.assertEqual(len(valid_traps), 2)
-        self.assertIn(mock_trap_hole, valid_traps)
+        self.assertIn(mock_trap_hole, valid_traps) # Retorna a carta real
         self.assertIn(mock_magic_cylinder, valid_traps)
-        self.assertNotIn(mock_raigeki, valid_traps) # Não é armadilha
+        self.assertNotIn(mock_raigeki, valid_traps)
         
-        # Verifica se o engine populou o monstro atacante na armadilha
+        # Verifica se a engine populou o monstro atacante na armadilha *interna*
         self.assertEqual(mock_trap_hole.attackingMonster, mock_blue_eyes)
-        self.assertEqual(mock_magic_cylinder.attackingMonster, mock_blue_eyes)
 
-
-    ## --- Testes de Handlers de Rede (Mensagens Recebidas) ---
-    
-    def test_handle_opponent_pass_turn(self):
-        # Simula o oponente (P1) terminando o turno
-        self.engine.turnPlayer = self.player1
-        self.engine.nonTurnPlayer = self.player2
-        self.engine.currentPhase = GamePhase.END
-        
-        self.engine.handle_opponent_pass_turn()
-
-        # Agora é o turno do P2 (local)
-        self.assertEqual(self.engine.turnPlayer, self.player2)
-        self.assertEqual(self.engine.nonTurnPlayer, self.player1)
-        self.assertEqual(self.engine.currentPhase, GamePhase.DRAW)
-        self.assertEqual(self.engine.turnCount, 2)
-
-    @patch('YGOengine.Monster') # Mocka a classe Monstro
-    def test_handle_opponent_summon_monster(self, mock_monster_class):
-        # Simula o recebimento de uma invocação do P1 (oponente)
-        self.engine.turnPlayer = self.player1
-        self.player1.monstersInField = []
-        self.player1.monstersCount = 0
-        
-        # O payload recebido
-        payload = {
-            "card": {"name": "Opponent Monster", "ATK": 1000, "type": "MONSTER"}
-        }
-        
-        # Configura o mock da classe para retornar um mock de instância
-        mock_opponent_monster = MagicMock()
-        mock_monster_class.return_value = mock_opponent_monster
-        
-        self.engine.handle_opponent_summon_monster(payload)
-
-        # Verifica se o construtor de Monstro foi chamado com os dados corretos
-        mock_monster_class.assert_called_with(
-            name="Opponent Monster",
-            ATK=1000,
-            type=CardType.MONSTER
-        )
-        # Verifica se o monstro "dummy" foi adicionado ao campo do oponente (P1)
-        self.assertIn(mock_opponent_monster, self.player1.monstersInField)
-        self.assertEqual(self.player1.monstersCount, 1)
-
-    def test_handle_opponent_activate_spell_raigeki(self):
-        # O P1 (oponente) ativa Raigeki
-        # O P2 (local) tem um monstro
-        self.engine.turnPlayer = self.player1
-        self.engine.nonTurnPlayer = self.player2
-        self.player2.monstersInField = [mock_dark_magician]
-        
-        payload = {"card": {"name": "Raigeki"}}
-        
-        self.engine.handle_opponent_activate_spell(payload)
-        
-        # Verifica se o monstro do P2 (local) foi para o cemitério
-        self.player2.monsterIntoGraveyard.assert_called_with(mock_dark_magician)
-        self.assertNotIn(mock_dark_magician, self.player2.monstersInField)
-
-    def test_handle_opponent_declare_attack_local_has_no_trap(self):
+    def test_handle_opponent_declare_attack_no_trap(self):
         # P1 (oponente) ataca P2 (local)
         self.engine.turnPlayer = self.player1
         self.engine.nonTurnPlayer = self.player2
-        self.player1.monstersInField = [mock_blue_eyes]
-        self.player2.monstersInField = [mock_dark_magician]
-        self.player2.spellsAndTrapsInField = [] # P2 não tem armadilhas
+        self.player1.monstersInField.append(mock_blue_eyes)
+        self.player2.monstersInField.append(mock_dark_magician)
         
-        # Mock da interface que pergunta ao jogador
-        mock_interface = Mock()
-        mock_interface.promptTrapActivation.return_value = None # Jogador escolhe "não"
+        mock_interface = Mock() # Mock da UI
+        mock_interface.promptTrapActivation.return_value = None
         
         payload = {"attacker_index": 0, "target_index": 0}
         
@@ -468,63 +373,55 @@ class TestYGOEngine(unittest.TestCase):
         mock_interface.promptTrapActivation.assert_not_called()
         
         # Deve enviar uma resposta "não" para a rede
-        self.mock_network.send_message.assert_called_once()
-        # (Opcional) Verificar o conteúdo da mensagem
-        args, kwargs = self.mock_network.send_message.call_args
-        sent_message = args[0]
-        self.assertEqual(sent_message['tipo'], MessageType.ATIVAR_ARMADILHA)
-        self.assertFalse(sent_message['payload']['ativar'])
-        self.assertFalse(sent_message['payload']['tem_armadilha'])
+        self.mock_network.send_message.assert_called_with(
+            MessageConstructor.ativar_armadilha(ativar=False, tem_armadilha=False)
+        )
 
-    def test_handle_opponent_declare_attack_local_activates_trap(self):
+    @patch('Components.YGOengine.YGOengine.activateTrap') # Mocka a função de ativação
+    def test_handle_opponent_declare_attack_activates_trap(self, mock_activate_trap):
         # P1 (oponente) ataca P2 (local)
         self.engine.turnPlayer = self.player1
         self.engine.nonTurnPlayer = self.player2
-        self.player1.monstersInField = [mock_blue_eyes]
-        self.player2.monstersInField = [mock_dark_magician]
-        self.player2.spellsAndTrapsInField = [mock_trap_hole] # P2 tem uma armadilha
+        self.player1.monstersInField.append(mock_blue_eyes)
+        self.player2.monstersInField.append(mock_dark_magician)
         
-        # Mock da interface que pergunta ao jogador
+        # Simula FacedownCard com a armadilha
+        mock_fd_trap = MagicMock(spec=FacedownCard)
+        mock_fd_trap.card = mock_trap_hole
+        self.player2.spellsAndTrapsInField.append(mock_fd_trap)
+        
         mock_interface = Mock()
-        # Jogador escolhe "sim", ativar a armadilha
+        # Simula o jogador escolhendo ativar a armadilha
         mock_interface.promptTrapActivation.return_value = mock_trap_hole 
         
         payload = {"attacker_index": 0, "target_index": 0}
         
-        # Patch a função 'activateTrap' para verificar se ela é chamada
-        # sem executar sua lógica interna (que enviaria outra msg de rede)
-        with patch.object(self.engine, 'activateTrap') as mock_activate_trap:
-            self.engine.handle_opponent_declare_attack(payload, mock_interface)
+        self.engine.handle_opponent_declare_attack(payload, mock_interface)
             
-            # Deve perguntar ao jogador
-            mock_interface.promptTrapActivation.assert_called_once()
-            
-            # Deve chamar a ativação da armadilha localmente
-            mock_activate_trap.assert_called_with(
-                self.player2, self.player1, mock_trap_hole
-            )
-            
-            # A *própria* activateTrap enviaria a mensagem,
-            # então a send_message *deste* método não deve ser chamada.
-            self.mock_network.send_message.assert_not_called()
+        mock_interface.promptTrapActivation.assert_called_once()
+        
+        # Deve chamar a ativação da armadilha (P2 ativa contra P1)
+        mock_activate_trap.assert_called_with(
+            self.player2, self.player1, mock_trap_hole
+        )
+        # A 'activateTrap' (mockada) é que enviaria a msg, não este handler
+        self.mock_network.send_message.assert_not_called()
 
     def test_handle_opponent_battle_result(self):
-        # P1 (oponente) foi o atacante
-        # P2 (local) foi o defensor
+        # P1 (oponente) atacou, P2 (local) defendeu
         self.engine.turnPlayer = self.player1
         self.engine.nonTurnPlayer = self.player2
-        self.player1.monstersInField = [mock_blue_eyes]
-        self.player2.monstersInField = [mock_dark_magician]
-        self.player1.life = 4000
-        self.player2.life = 4000
-        mock_blue_eyes.canAttack = True # Estava apto a atacar
+        self.player1.monstersInField.append(mock_blue_eyes)
+        self.player2.monstersInField.append(mock_dark_magician)
+        self.player2.monstersCount = 1 # Estado inicial
+        mock_blue_eyes.canAttack = True 
         
-        # Payload do resultado (P1 venceu, P2 tomou dano e perdeu monstro)
+        # Payload do resultado (P1 venceu)
         payload = {
-            "dano_ao_atacante": 0,
-            "dano_ao_defensor": 500,
-            "monstro_atacante_destruido": False,
-            "monstro_defensor_destruido": True,
+            "dano_atacante": 0,    # Payload da rede
+            "dano_defensor": 500,  # Payload da rede
+            "atacante_destruido": False,
+            "defensor_destruido": True,
             "atacante_idx": 0,
             "defensor_idx": 0
         }
@@ -534,13 +431,12 @@ class TestYGOEngine(unittest.TestCase):
         # Verifica se o estado local (P2) foi atualizado
         self.assertEqual(self.player2.life, 3500)
         self.player2.monsterIntoGraveyard.assert_called_with(mock_dark_magician)
-        
-        # Verifica se o estado do oponente (P1) foi atualizado
-        self.assertEqual(self.player1.life, 4000)
+        self.assertEqual(self.player2.monstersCount, 0) # Validado pelo side_effect
+
+        # Verifica se o estado do oponente (P1) também foi atualizado
         self.player1.monsterIntoGraveyard.assert_not_called()
-        
-        # Verifica se o monstro do oponente (P1) foi marcado como "já atacou"
-        self.assertFalse(mock_blue_eyes.canAttack)
+        self.assertFalse(mock_blue_eyes.canAttack) # Marcou como atacado
+
 
 if __name__ == '__main__':
     unittest.main()

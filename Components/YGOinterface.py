@@ -13,6 +13,7 @@ class YGOinterface:
         print("[3] Olhar Cemitério")
         print("[4] Ir para Battle Phase")
         print("[5] Encerrar Turno")
+        print("[6] Desconectar")
 
         while True:
             choice = input(f"{playerName}, escolha sua ação: ")
@@ -26,6 +27,8 @@ class YGOinterface:
                 return "GO_TO_BATTLE_PHASE"
             if choice == "5":
                 return "END_TURN"
+            if choice == "6":
+                return "DISCONNECT"
             print("Opção inválida.")
 
     def promptBattlePhaseActions(self, playerName: str) -> str:
@@ -34,6 +37,7 @@ class YGOinterface:
         print("[2] Olhar Cemitério")
         print("[3] Atacar")
         print("[4] Encerrar Turno")
+        print("[5] Desconectar")
 
         while True:
             choice = input(f"{playerName}, escolha sua ação: ")
@@ -45,6 +49,8 @@ class YGOinterface:
                 return "DECLARE_ATTACK"
             if choice == "4":
                 return "END_TURN"
+            if choice == "5":
+                return "DISCONNECT"
             print("Opção inválida.")
 
     def displayPhase(self, phaseName: str, playerName: str, turnCount: int):
@@ -117,7 +123,7 @@ class YGOinterface:
                     count += 1
             else:
                 print("Você não tem nenhum monstro em campo.")
-            time.sleep(2)
+            time.sleep(0.5)
 
             if len(player.spellsAndTrapsInField) > 0:
                 count = 0
@@ -129,7 +135,7 @@ class YGOinterface:
                     print(f"{count}) {spellTrap.name}")
             else:
                 print("Você não tem nenhuma magia ou armadilha virada para baixo.")
-            time.sleep(2)
+            time.sleep(0.5)
         elif visualiza == 2:
             if len(opponent.monstersInField) > 0:
                 print(
@@ -142,10 +148,10 @@ class YGOinterface:
                 print(
                     f"Seu oponente tem {opponent.spellsAndTrapsCount} cartas viradas para baixo e nenhum monstro em campo."
                 )
-            time.sleep(2)
+            time.sleep(0.5)
         else:
             print("Opção inválida!")
-            time.sleep(2)
+            time.sleep(0.5)
 
     # Função para olhar o próprio cemitério
     def viewGraveyard(self, player: player.Player):
@@ -158,7 +164,7 @@ class YGOinterface:
                 print(f"{count}) {card.name}")
         else:
             print("Você não tem cartas no cemitério.")
-        time.sleep(2)
+        time.sleep(0.5)
 
     # Função para olhar a própria mão
     def viewHand(self, player: player.Player, playerCanSummon: bool):
@@ -184,7 +190,7 @@ class YGOinterface:
                 return self.cardAction(player.hand[next - 1], playerCanSummon)
         else:
             print("Você não tem cartas na mão.")
-        time.sleep(2)
+        time.sleep(0.5)
 
     def selectAttacker(self, attackers: list[Monster]):
         count = 0
